@@ -186,7 +186,7 @@ environment, reviewing audit trails, or responding to incidents, the author
 offers paid advisory engagements. See
 **[TERMS-OF-SERVICE.md](TERMS-OF-SERVICE.md)**.
 
-Contact: security@nibvok.com
+Contact: data@nibvok.com
 
 ## Further reading
 

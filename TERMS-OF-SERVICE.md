@@ -9,7 +9,7 @@
 
 **Effective date:** `[DATE]`
 **Provider:** NIBVOK Inc. ("Provider", "we")
-**Contact:** `security@[domain]`
+**Contact:** `data@nibvok.com`
 
 ---
 
