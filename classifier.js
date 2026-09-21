@@ -74,6 +74,12 @@
 // Policy source: owner-authored, 2026-09-18 (supersedes the earlier
 // ALLOW/CONFIRM/DENY matrix). Enforcement is this plugin's before_tool_call
 // hook — NOT the bundled `policy` plugin, which only audits config drift.
+//
+// The posture knobs (writable roots, write/delete posture, spend ceiling) come
+// from `policies.js`, selected by NIBVOK_AI_SECURITY_POLICY. The RULE SET itself
+// stays compiled in — a preset chooses a posture, it does not author rules.
+
+import { resolvePolicy } from "./policies.js";
 
 // ────────────────────────────────────────────────────────────
 // Policy data
@@ -90,6 +96,7 @@
  *   ASF_LOG_ROOT           where this deployment keeps its logs
  *   ASF_WORKSPACE_ROOT     the agent workspace
  *   NIBVOK_AI_SECURITY_PLUGIN_ROOT        this plugin's own directory (bootstrap exemption)
+ *   NIBVOK_AI_SECURITY_POLICY             preset posture (see policies.js); default "development"
  *   NIBVOK_AI_SECURITY_SPEND_CEILING_USD  transaction ceiling (default 500)
  */
 export const ARTIFACT_ROOT = process.env.ASF_ARTIFACT_ROOT || "/var/asf/artifacts/";
@@ -97,16 +104,14 @@ export const LOG_ROOT = process.env.ASF_LOG_ROOT || "/var/log/asf/";
 const WORKSPACE_ROOT =
   process.env.ASF_WORKSPACE_ROOT || "/root/.openclaw/workspace/";
 
+/** The resolved preset posture (see policies.js). */
+export const POLICY = resolvePolicy(process.env);
+
 /** Where agents may write. Artifact writes are allow+log (not silent). */
-export const ALLOWED_WRITE_ROOTS = [
-  WORKSPACE_ROOT,
-  ARTIFACT_ROOT,
-  "/tmp/",
-  "/var/tmp/",
-];
+export const ALLOWED_WRITE_ROOTS = POLICY.writeRoots;
 
 /** Writes here are recorded in the audit log even though they are allowed. */
-export const LOGGED_WRITE_ROOTS = [ARTIFACT_ROOT];
+export const LOGGED_WRITE_ROOTS = POLICY.loggedWriteRoots;
 
 /** System paths where any write is a hard deny. */
 export const SYSTEM_DENY_ROOTS = [
@@ -155,6 +160,9 @@ export const ALLOWED_READ_ROOTS = [
   // other allowed roots; DENIED_READ_PATTERNS still wins for secret material.
   "/tmp/",
   "/var/tmp/",
+  // Extra read roots from the active preset (e.g. Research adds reference/docs
+  // trees). Empty for every other preset, so this is inert by default.
+  ...POLICY.extraReadRoots,
 ];
 
 /** Narrow exceptions inside otherwise-denied parents (checked first). */
@@ -328,11 +336,9 @@ export const GOVERNANCE_PATHS = [
 ];
 
 /** Hard OUTBOUND spend ceiling; at or above this, an expenditure confirms (ABC guardrail).
- *  Inbound revenue is NOT expenditure and does not escalate (owner ruling 2026-09-21). */
-export const SPEND_CEILING_USD = (() => {
-  const n = Number(process.env.NIBVOK_AI_SECURITY_SPEND_CEILING_USD);
-  return Number.isFinite(n) && n > 0 ? n : 500;
-})();
+ *  Inbound revenue is NOT expenditure and does not escalate (owner ruling 2026-09-21).
+ *  Default 500; a preset may set it, and NIBVOK_AI_SECURITY_SPEND_CEILING_USD still wins. */
+export const SPEND_CEILING_USD = POLICY.spendCeilingUsd;
 
 const DENY = "deny";
 const CONFIRM = "confirm";
@@ -1036,6 +1042,13 @@ export function classifyWritePath(rawPath) {
     }
   }
 
+  // Read-only / locked-down postures: no write is permitted except the
+  // bootstrap exemption above. Checked here, after the secret-material rule, so
+  // a secret write still reports the more specific reason.
+  if (POLICY.denyWrites) {
+    return { action: DENY, reason: `write denied by policy (${POLICY.label} posture)` };
+  }
+
   if (!path.startsWith("/")) {
     if (path.split("/").includes("..")) {
       return { action: DENY, reason: `relative write escaping the workspace (${path})` };
@@ -1188,6 +1201,30 @@ function denyExec(cmd) {
   }
   const readDenied = readDenyInExec(cmd);
   if (readDenied) return readDenied;
+
+  // ── Preset posture (policies.js) ──
+  // Both flags default to false, so the default "development" posture behaves
+  // exactly as before these presets existed. A stricter preset refuses the
+  // action outright rather than downgrading it to a prompt.
+  if (
+    POLICY.denyDelete &&
+    matchesOutsideInert(cmd, RM_ANY, inert) &&
+    !isBootstrapConfined(cmd)
+  ) {
+    return {
+      action: DENY,
+      reason: `delete denied by policy (${POLICY.label} posture)`,
+    };
+  }
+  if (POLICY.denyWrites) {
+    const w = writeTargetsIn(cmd).find((p) => !isBootstrapPath(p));
+    if (w) {
+      return {
+        action: DENY,
+        reason: `write denied by policy (${POLICY.label} posture)`,
+      };
+    }
+  }
   return null;
 }
 

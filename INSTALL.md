@@ -64,24 +64,27 @@ that still reports `enabled` — the exact failure in INCIDENTS.md #6.
 
 ## 2. Run the test suites first
 
-All three run without a Gateway, a restart, or a live tool call:
+All five run without a Gateway, a restart, or a live tool call:
 
 ```bash
 node test-classifier.mjs      # expect: 274 passed, 0 failed
 node test-hook.mjs            # expect: 29 passed, 0 failed
 node test-session-trust.mjs   # expect: 27 passed, 0 failed
+node test-audit-chain.mjs     # expect: 18 passed, 0 failed
+node test-policies.mjs        # expect: 15 passed, 0 failed
 ```
 
 **Two of them need the OpenClaw plugin SDK on the module path.**
-`test-classifier.mjs` is self-contained and always runs.
-`test-hook.mjs` and `test-session-trust.mjs` drive the plugin through its
-registered handler, so they import `index.js`, which imports
+`test-classifier.mjs` is self-contained and always runs; so are
+`test-audit-chain.mjs` (pure hash-chain logic) and `test-policies.mjs` (loads the
+classifier in a child process). `test-hook.mjs` and `test-session-trust.mjs` drive
+the plugin through its registered handler, so they import `index.js`, which imports
 `openclaw/plugin-sdk/plugin-entry` — supplied by the OpenClaw **host**, and not
 resolvable from a bare clone. Node exits **3** with a `SKIPPED` message in that
 case, deliberately distinct from exit **1** (a real test failure): "could not
 run" must never read as "ran and passed".
 
-To run all three from a clone:
+To run all five from a clone:
 
 ```bash
 mkdir -p node_modules
@@ -202,6 +205,8 @@ audit lines means the hook is not running**, even if §5.1 looked healthy.
 [ ] test-classifier.mjs   274 passed
 [ ] test-hook.mjs          29 passed (or exit 3 without the SDK)
 [ ] test-session-trust.mjs  27 passed (or exit 3 without the SDK)
+[ ] test-audit-chain.mjs    18 passed
+[ ] test-policies.mjs       15 passed
 [ ] plugins.load.paths points at the directory
 [ ] plugins enable <id>        → enabled
 [ ] gateway restarted

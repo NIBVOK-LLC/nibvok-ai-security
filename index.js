@@ -9,9 +9,10 @@
 // The bundled `@openclaw/policy` plugin is NOT this. It audits config drift and
 // emits attestation hashes; per its own docs it "does not enforce tool calls or
 // rewrite runtime behavior at request time." Enforcement lives here.
-import { appendFileSync } from "node:fs";
+import { appendFileSync, readFileSync } from "node:fs";
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { classifyToolCall, confirmClass, SESSION_TRUSTABLE_CLASSES } from "./classifier.js";
+import { GENESIS, entryHash, lastHashOfText } from "./audit-chain.js";
 
 /**
  * Where decisions are recorded: one JSON line per tool call.
@@ -59,13 +60,30 @@ function grantSessionTrust(sessionKey, cls) {
  *
  * `product` is a FIELD, not a "[NIBVOK] " line prefix: the audit log is JSONL, and
  * a textual prefix per line would make the file unparseable by every reader.
+ *
+ * Every entry is HASH-CHAINED: it carries `prev_hash` (the previous entry's
+ * `hash`) and its own `hash`, so an edit, reorder, removal or insertion anywhere
+ * in the file is detectable after the fact. See `audit-chain.js` for what the
+ * chain proves and what it does not. `lastHash` is seeded from the existing
+ * file tail so the chain continues across a Gateway restart.
  */
+function readLastHash(file) {
+  try {
+    return lastHashOfText(readFileSync(file, "utf8"));
+  } catch {
+    return GENESIS;
+  }
+}
+
+let lastHash = readLastHash(AUDIT_LOG);
+
 function audit(entry) {
   try {
-    appendFileSync(
-      AUDIT_LOG,
-      JSON.stringify({ ts: new Date().toISOString(), product: PRODUCT, ...entry }) + "\n",
-    );
+    const record = { ts: new Date().toISOString(), product: PRODUCT, ...entry };
+    const prev_hash = lastHash;
+    const hash = entryHash(record, prev_hash);
+    appendFileSync(AUDIT_LOG, JSON.stringify({ ...record, prev_hash, hash }) + "\n");
+    lastHash = hash;
   } catch {
     // Governance must not fail closed on an audit-log write error.
   }

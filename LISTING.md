@@ -4,7 +4,7 @@
 confirmed, or denied *before* it runs.**
 
 Version `0.1.0` · Plugin id `nibvok-ai-security` · Category `security`
-Zero-config · One hook · 330 tests
+Zero-config · One hook · 363 tests
 
 ---
 
@@ -12,12 +12,14 @@ Zero-config · One hook · 330 tests
 
 **Description** — 92 characters (limit 120):
 
-> Runtime enforcement for OpenClaw agents. Allow, confirm, or deny every tool call. 330 tests.
+> Runtime enforcement for OpenClaw agents. Allow, confirm, or deny every tool call. 363 tests.
 
-> An earlier draft of this line ended *"Hash-chained audit trail."* **That claim
-> is false and was removed.** There is no hash chain; see *What it honestly does
-> not do* below. A listing that promises tamper-evidence the code does not
-> provide is the kind of claim this project exists to catch.
+> An earlier draft of this line ended *"Hash-chained audit trail."* It was removed
+> when there was no hash chain. **As of 2026-09-21 there is one** — every audit
+> entry carries `prev_hash` and `hash`, and `verify-audit-chain.mjs` walks the
+> chain. The claim is restored, with its limit stated: the chain proves the log is
+> internally consistent, NOT that it is authentic against a full rewrite (see
+> *What it honestly does not do*).
 
 **Search phrases** (ClawHub indexes the description for vector search):
 
@@ -89,13 +91,15 @@ log, so the reasoning is reviewable after the fact rather than inferred.
 
 ## Proof
 
-The behaviour is covered by **330 tests** across three suites:
+The behaviour is covered by **363 tests** across five suites:
 
 | Suite | Tests | Covers |
 |---|---|---|
 | `test-classifier.mjs` | 274 | decision logic, path/host/spend classification, deny and confirm rules |
 | `test-hook.mjs` | 29 | hook registration, decision mapping, approval and audit wiring |
 | `test-session-trust.mjs` | 27 | session-scoped trust: grant, scope, and restart expiry |
+| `test-audit-chain.mjs` | 18 | a modified, reordered, removed or inserted audit entry breaks the hash chain |
+| `test-policies.mjs` | 15 | each of the five preset postures, cold-loaded |
 
 Run them yourself:
 
@@ -144,9 +148,12 @@ defaults:
 
 ## What it honestly does not do
 
-- **The audit log is not tamper-evident.** It is append-only JSON Lines. There
-  is no hash chain and no retention policy. Anything with write access to the
-  log file can alter it — this is a record, not a notary.
+- **The audit log is tamper-EVIDENT, not tamper-PROOF.** Every entry carries a
+  `prev_hash` and its own `hash`, so an edit, reorder, removal or insertion
+  anywhere in the file is detectable by `verify-audit-chain.mjs`. What it does
+  NOT detect: a full rewrite of the file from genesis with every hash recomputed,
+  or truncation of trailing entries. Those need a signature or an external
+  anchor, which this package does not ship. There is also no retention policy.
 - **Session trust does not survive a restart.** Deliberate: trust that
   outlives the process is trust nobody re-approved.
 - **It sees the call, not the outcome.** The classifier judges a tool call
