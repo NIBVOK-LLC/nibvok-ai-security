@@ -4,8 +4,8 @@
 > This is a drafting skeleton, not an executable agreement. Every `[BRACKETED]`
 > field must be filled and the whole document reviewed by a qualified attorney
 > in the governing jurisdiction before it is offered to any customer.
-> **Pricing is deliberately left blank.** Commercial terms are an owner decision
-> and are not set by this document.
+> Pricing is set by the current service schedule. Fees quoted here are the working
+> set and are confirmed in the applicable statement of work.
 
 **Effective date:** `[DATE]`
 **Provider:** NIBVOK Inc. ("Provider", "we")
@@ -30,25 +30,41 @@ separate written statement of work.
 
 | Service | What it is | What it is not |
 |---|---|---|
-| **Policy Setup** | `[one-time]` engagement to configure the enforcement layer for the customer's environment | not a guarantee that any particular action will be allowed or denied |
-| **Managed Audit** | `[recurring]` review of the customer's audit trail, with a written report | not continuous monitoring, and not a substitute for the customer's own review |
-| **Incident Response** | investigation and remediation support after an event | not a warranty that an incident will be contained, or that a recurrence is impossible |
+| **Policy Setup** (one-time) | engagement to configure the enforcement layer for the customer's environment | not a guarantee that any particular action will be allowed or denied |
+| **Managed Audit** (monthly) | review of the customer's audit trail, with a written report each period | not continuous monitoring, and not a substitute for the customer's own review |
+| **Incident Response** (per incident) | investigation and remediation support after an event | not a warranty that an incident will be contained, or that a recurrence is impossible |
+| **Enterprise Policy Pack** (one-time) | multi-environment policy set with fleet-wide rollout guidance | not a guarantee of any particular action's outcome |
+
+Every engagement is **advisory and bounded**: the applicable statement of work states
+the included hours and the environments covered. Work outside that scope is quoted
+separately before it is performed.
 
 ## 3. Payment terms
 
-- **Fees:** `[AMOUNT / RATE]` per the applicable statement of work.
-- **Billing cycle:** `[MONTHLY / PER-ENGAGEMENT]`.
-- **Refunds:** `[TERMS]`.
+- **Fees:** per the applicable statement of work. Current schedule:
+
+  | Service | Fee |
+  |---|---|
+  | Policy Setup | $499, one-time |
+  | Managed Audit | $199 per month |
+  | Incident Response | $500 per incident |
+  | Enterprise Policy Pack | $999, one-time |
+
+- **Billing cycle:** one-time services are invoiced on completion; Managed Audit is
+  invoiced monthly in advance.
+- **Refunds:** the Policy Setup fee is refundable within **30 days** of payment.
+  Other fees are non-refundable once the corresponding period or engagement has begun.
 - **Late payment:** `[TERMS]`.
 
-## 4. Auto-renewal
+## 4. Term and cancellation
 
-If a service is recurring, it **auto-renews** `[PERIOD]` unless either party
-cancels before the renewal date. Cancellation is available at any time through
-`[METHOD]` and takes effect at the end of the then-current period. We will send
-a reminder before each renewal.
+Recurring services (Managed Audit) are **month-to-month**. Either party may cancel
+at any time; cancellation takes effect at the end of the then-current month.
+**There is no auto-renewal term.** A recurring service continues only until
+cancelled, and no renewal commitment is created by these terms.
 
-*Placeholder above must be completed or the auto-renewal clause removed.*
+Any future auto-renewal arrangement would be introduced as an explicit, separately
+agreed term — it is not part of this agreement.
 
 ## 5. Customer responsibilities
 
@@ -89,9 +105,9 @@ Provider may terminate for breach of this section.
 
 ## 9. Term and termination
 
-Either party may terminate as set out in the applicable statement of work or the
-auto-renewal clause. Sections on confidentiality, limitation of liability,
-acceptable use, and governing law survive termination.
+Either party may terminate as set out in the applicable statement of work or
+Section 4. Sections on confidentiality, limitation of liability, acceptable use,
+and governing law survive termination.
 
 ## 10. Governing law and disputes
 
@@ -102,7 +118,8 @@ acceptable use, and governing law survive termination.
 ## 11. Changes
 
 We may update these terms for future engagements. Material changes will be
-notified `[METHOD]` before they take effect for a renewed term.
+notified `[METHOD]` before they take effect, and apply only to engagements begun
+after that notice.
 
 ---
 
