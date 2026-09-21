@@ -1,0 +1,13 @@
+{
+  "id": "nibvok-ai-security",
+  "name": "NIBVOK AI Security",
+  "description": "Runtime policy enforcement for OpenClaw agents: every tool call is allowed, confirmed, or denied before it runs.",
+  "categories": ["security"],
+  "activation": {
+    "onStartup": true
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false
+  }
+}

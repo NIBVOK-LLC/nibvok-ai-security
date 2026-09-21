@@ -1,0 +1,53 @@
+name: Traffic tracker
+
+# GitHub retains traffic data for only 14 days, so this captures it daily into
+# version-controlled CSVs. Without it, the first two weeks of interest in a
+# launch are lost and unrecoverable.
+#
+# Dependency-free on purpose. The common advice is to use an off-the-shelf
+# traffic action, but pulling an unpinned third-party action into the release
+# pipeline of a *security* product adds a supply-chain surface to save ~40
+# lines of curl. The only action used here is actions/checkout, and it should be
+# pinned to a commit SHA (see TODO below) for the same reason.
+
+on:
+  schedule:
+    # 03:17 UTC — off the hour. GitHub schedules on the hour are congested and
+    # a delayed run is still fine here, but a *dropped* one is not: the data
+    # expires in 14 days.
+    - cron: "17 3 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write   # needed to commit the captured CSVs back to the repo
+
+# Never let two runs race on the same CSVs.
+concurrency:
+  group: traffic-tracker
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        # TODO: pin to a commit SHA before relying on this, e.g.
+        #   uses: actions/checkout@<40-char-sha>  # v4.x.y
+        uses: actions/checkout@v4
+
+      - name: Capture traffic
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/scripts/capture-traffic.sh
+
+      - name: Commit
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add traffic/
+          if git diff --cached --quiet; then
+            echo "No new traffic data."
+          else
+            git commit -m "chore(traffic): capture $(date -u +%F)"
+            git push
+          fi

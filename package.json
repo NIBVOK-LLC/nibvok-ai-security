@@ -1,0 +1,42 @@
+{
+  "name": "@choosing-independence/nibvok-ai-security",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Runtime policy enforcement for OpenClaw agents: allow, confirm, or deny every tool call.",
+  "files": [
+    "index.js",
+    "classifier.js",
+    "openclaw.plugin.json",
+    "README.md",
+    "LISTING.md",
+    "POLICY.md",
+    "INSTALL.md",
+    "INCIDENTS.md",
+    "SCREENSHOTS.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "TERMS-OF-SERVICE.md",
+    "test-*.mjs",
+    "assets/**"
+  ],
+  "openclaw": {
+    "extensions": [
+      "./index.js"
+    ],
+    "compat": {
+      "pluginApi": ">=2026.9.0"
+    },
+    "build": {
+      "openclawVersion": "2026.9.4",
+      "bundledDist": false
+    },
+    "install": {
+      "clawhubSpec": "clawhub:@choosing-independence/nibvok-ai-security",
+      "defaultChoice": "clawhub",
+      "minHostVersion": ">=2026.9.0"
+    },
+    "release": {
+      "publishToClawHub": true
+    }
+  }
+}
