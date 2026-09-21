@@ -8,7 +8,7 @@
 > set and are confirmed in the applicable statement of work.
 
 **Effective date:** `[DATE]`
-**Provider:** NIBVOK Inc. ("Provider", "we")
+**Provider:** NIBVOK, LLC ("Provider", "we")
 **Contact:** `data@nibvok.com`
 
 ---
@@ -48,7 +48,7 @@ separately before it is performed.
   | Policy Setup | $499, one-time |
   | Managed Audit | $199 per month |
   | Incident Response | $500 per incident |
-  | Enterprise Policy Pack | $999, one-time |
+  | Enterprise Policy Pack | contact `data@nibvok.com` for pricing |
 
 - **Billing cycle:** one-time services are invoiced on completion; Managed Audit is
   invoiced monthly in advance.
