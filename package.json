@@ -1,5 +1,5 @@
 {
-  "name": "@choosing-independence/nibvok-ai-security",
+  "name": "@nibvok-llc/ai-security-force",
   "version": "0.1.0",
   "type": "module",
   "description": "Runtime policy enforcement for OpenClaw agents: allow, confirm, or deny every tool call.",
@@ -31,7 +31,7 @@
       "bundledDist": false
     },
     "install": {
-      "clawhubSpec": "clawhub:@choosing-independence/nibvok-ai-security",
+      "clawhubSpec": "clawhub:@nibvok-llc/ai-security-force",
       "defaultChoice": "clawhub",
       "minHostVersion": ">=2026.9.0"
     },
