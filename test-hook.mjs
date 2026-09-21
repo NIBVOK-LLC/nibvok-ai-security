@@ -66,7 +66,10 @@ t("git push --force", { toolName: "exec", params: { command: "git push --force o
 t("rm -rf build", { toolName: "exec", params: { command: "rm -rf build/" } }, "approval");
 t("git reset --hard", { toolName: "exec", params: { command: "git reset --hard" } }, "approval");
 t("drop table", { toolName: "exec", params: { command: "sqlite3 a.db 'DROP TABLE u'" } }, "approval");
-t("spend >= $500", { toolName: "exec", params: { command: "curl https://api.stripe.com/v1/charges -d amount=60000" } }, "approval");
+// NOTE (2026-09-21): OUTBOUND endpoint. This used /charges, a COLLECTION --
+// inbound revenue, which no longer escalates under the narrowed rule. The spend
+// CLASS is unchanged; only the command that reaches it changed.
+t("spend >= $500", { toolName: "exec", params: { command: "curl https://api.stripe.com/v1/transfers -d amount=60000" } }, "approval");
 t("write outside workspace", { toolName: "exec", params: { command: "echo x > /root/other/f.txt" } }, "approval");
 
 console.log("\nALLOW (must pass untouched - the false-positive check):");
@@ -78,6 +81,21 @@ t("secrets allow-host grant", { toolName: "exec", params: { command: "openclaw s
 t("outbound send (allow+log)", { toolName: "conversations_send", params: { message: "hi" } }, "allow");
 t("word 'secret' in a log line", { toolName: "exec", params: { command: "echo 'no secrets' >> /root/.openclaw/workspace/l.txt" } }, "allow");
 t("edit tool", { toolName: "edit", params: { path: "app/main.py" } }, "allow");
+
+console.log("\nTERMINAL / PROCESS (INCIDENTS.md #23):");
+t("terminal input: cat shadow blocks", { toolName: "terminal", params: { action: "input", sessionId: "t1", data: "cat /etc/" + "sha" + "dow" } }, "block");
+t("process write: cat shadow blocks", { toolName: "process", params: { action: "write", sessionId: "p1", data: "cat /etc/" + "sha" + "dow" } }, "block");
+t("terminal input: ordinary work allows", { toolName: "terminal", params: { action: "input", data: "git status" } }, "allow");
+
+// The hook only runs for tools its matcher NAMES. A tool absent from the list is
+// never classified at all -- the other half of the #23 gap.
+const matcher = (h.opts && h.opts.matcher) || [];
+console.log("\nMATCHER COVERAGE (a tool not listed is never classified):");
+for (const tool of ["exec", "process", "terminal", "read", "write"]) {
+  const present = matcher.includes(tool);
+  present ? nOk++ : fail++;
+  console.log(`  ${present ? "PASS" : "FAIL"}  matcher covers ${tool}`);
+}
 
 console.log(`\n${nOk} passed, ${fail} failed`);
 if (fail) process.exit(1);

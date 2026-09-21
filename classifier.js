@@ -211,7 +211,100 @@ export const DENIED_READ_PATTERNS = [
   // explicit request, never silently, even though /root/.openclaw/ is allowed.
   /^\/root\/\.openclaw\/openclaw\.json/i,
   /^\/root\/\.openclaw\/state(\/|$)/i,
+  // Local account and authentication material. The owner's spec puts
+  // /etc/passwd at CONFIRM, which is right: it is world-readable and holds no
+  // secret. /etc/shadow does not belong at that tier. It holds the root
+  // password HASH, and because it sits under CONFIRM_READ_PARENTS it inherited
+  // the same CONFIRM as /etc/passwd -- and CONFIRM is session-trustable
+  // (SESSION_TRUSTABLE_CLASSES), so ONE approval in a session made the shadow
+  // file freely readable for the rest of that session. A password hash must not
+  // share a tier with /etc/passwd, and must not be reachable through session
+  // trust AT ALL. Denied here, and deliberately NOT added to READ_EXCEPTIONS,
+  // so no exemption can re-open it. See INCIDENTS.md #22.
+  /^\/etc\/shadow$/i,
+  /^\/etc\/shadow-$/,
+  /^\/etc\/gshadow$/i,
+  /^\/etc\/gshadow-$/,
+  /^\/etc\/master\.passwd$/i,
+  /^\/etc\/sudoers$/i,
+  /^\/etc\/sudoers\.d(\/|$)/i,
+  /^\/etc\/ssh\/ssh_host_[^\/]*_key$/i,
 ];
+
+/**
+ * Account/authentication filenames that hold real secret material, matched as a
+ * PATH SEGMENT rather than an absolute path.
+ *
+ * The absolute-path rule above is bypassable by a working-directory change:
+ * `cd /etc && cat shadow` names no absolute path, so `/etc/shadow` never
+ * appears in the command and the read matched nothing at all. Matching the
+ * segment closes that for these names specifically.
+ *
+ * A bare NAME is denied even in prose, and that is deliberate for the same
+ * reason the `.env` rule denies a bare `.env`: this layer is pure and lexical,
+ * so a mention cannot be told apart from a real read without parsing the shell,
+ * and it fails closed. Unlike #21's `.env.example` (a template holding no
+ * secret), every path here genuinely holds secret material.
+ */
+const SECRET_PATH_RES = [
+  /(?:^|\/)shadow$/,               // /etc/shadow   -- root password hash
+  /(?:^|\/)shadow-$/,              // /etc/shadow-  -- the previous shadow file
+  /(?:^|\/)gshadow$/,              // /etc/gshadow  -- group password hashes
+  /(?:^|\/)gshadow-$/,
+  /(?:^|\/)master\.passwd$/,       // BSD equivalent of shadow
+  /(?:^|\/)sudoers$/,              // sudo policy: privilege escalation
+  /(?:^|\/)ssh_host_[^\/]*_key$/,  // sshd private host keys
+];
+
+/** True when a path names registered account/authentication secret material. */
+function isAccountSecretPath(p) {
+  const n = normalize(p);
+  if (!n) return false;
+  if (/^\/etc\/sudoers\.d(\/|$)/i.test(n)) return true;
+  return SECRET_PATH_RES.some((re) => re.test(n));
+}
+
+/**
+ * Rewrite a command's LEADING `cd <dir>` (or `pushd`) prefix so that later
+ * operands resolve against it: `cd /etc && cat shadow` becomes
+ * `cd /etc && cat /etc/shadow`, which the ordinary path rules can classify.
+ *
+ * Lexical and conservative: only a `cd`/`pushd` at the very start of the command
+ * is rewritten, `..` is resolved by normalize, a relative target is left alone,
+ * and anything unrecognised is returned unchanged so the strictest reading of
+ * the original command is preserved. A `cd` inside a subshell or after another
+ * separator is NOT rewritten and stays the conservative case.
+ */
+function cdAbsolutize(cmd) {
+  const m = /^\s*(?:cd|pushd)\s+("?)([^\s"';&|]+)\1\s*(?:&&|;|\|\|)\s*/.exec(cmd);
+  if (!m) return cmd;
+  const dir = m[2];
+  if (!isAbsoluteish(dir)) return cmd;
+  const base = normalize(dir);
+  const rest = cmd.slice(m[0].length);
+  return `${m[0]}${rest.replace(
+    /(^|[\s"'=<>|;(&])([A-Za-z0-9_][A-Za-z0-9_.-]*)/g,
+    (whole, pre, tok) =>
+      SECRET_PATH_RES.some((re) => re.test(tok)) ? `${pre}${base}/${tok}` : whole,
+  )}`;
+}
+
+/**
+ * First account-secret operand named in a command, or null.
+ *
+ * Tokenises the command and tests each token as a path SEGMENT, so a bare
+ * `shadow` is caught as well as `/etc/shadow`. Path tokens are padded first so
+ * an operand jammed against shell punctuation is still separated.
+ */
+function accountSecretInExec(cmd) {
+  const scan = cmd.replace(/\/[A-Za-z0-9_./~-]*/g, (p) => ` ${p} `);
+  const re = /[A-Za-z0-9_./~-]*[A-Za-z0-9_~][A-Za-z0-9_./~-]*/g;
+  for (let m; (m = re.exec(scan)) !== null; ) {
+    const tok = m[0];
+    if (isAccountSecretPath(tok.includes("/") ? tok : `/${tok}`)) return tok;
+  }
+  return null;
+}
 
 /** Hosts approved for secret substitution (egress allowlist + OpenAI). */
 export const APPROVED_HOSTS = [
@@ -234,7 +327,8 @@ export const GOVERNANCE_PATHS = [
   "nibvok-ai-security",
 ];
 
-/** Hard spend ceiling; at or above this, a transaction confirms (ABC guardrail). */
+/** Hard OUTBOUND spend ceiling; at or above this, an expenditure confirms (ABC guardrail).
+ *  Inbound revenue is NOT expenditure and does not escalate (owner ruling 2026-09-21). */
 export const SPEND_CEILING_USD = (() => {
   const n = Number(process.env.NIBVOK_AI_SECURITY_SPEND_CEILING_USD);
   return Number.isFinite(n) && n > 0 ? n : 500;
@@ -572,6 +666,35 @@ function spendAtOrAboveCeiling(cmd) {
     if (!Number.isNaN(v) && v >= SPEND_CEILING_USD * 100) hits.push(v / 100);
   }
   return hits;
+}
+
+/**
+ * Which way does this command move money?
+ *
+ * The $500 hard stop exists to prevent unapproved EXPENDITURE (owner ruling
+ * 2026-09-21). Receiving money is not expenditure, so the ceiling applies to
+ * OUTBOUND spend only. Before this, the rule was direction-blind and a $999
+ * inbound sale escalated exactly like a $999 purchase, which made self-serve
+ * commerce impossible above the ceiling.
+ *
+ * Returns "inbound", "outbound", or "unknown". **Unknown resolves to outbound
+ * at the call site**, so any shape this function does not recognise still
+ * escalates. Narrowing the rule must not create a bypass: only an endpoint that
+ * positively names a collection shape is treated as revenue.
+ *
+ * @returns {"inbound"|"outbound"|"unknown"}
+ */
+function spendDirection(cmd) {
+  const t = String(cmd).toLowerCase();
+  // Money LEAVING. Checked first: if a command names both, leaving wins.
+  if (/\b(transfers?|payouts?|refunds?|disputes?|topups?|credit_notes?|debit_notes?|reversals?)\b/.test(t)) {
+    return "outbound";
+  }
+  // Money ARRIVING: a collection shape. Named explicitly, never inferred.
+  if (/\b(charges?|checkout\/sessions?|payment_intents?|payment_links?|invoices?|subscriptions?|quotes?)\b/.test(t)) {
+    return "inbound";
+  }
+  return "unknown";
 }
 
 /** Is this the approved `secrets store set ... --allow-host <approved>` form? */
@@ -956,9 +1079,31 @@ function readDenyInExec(cmd) {
   // so an absolute-path-only check would let it through. The boundary class
   // includes `/` so a path like /app/config/prod.env is still caught even when
   // its leading segment is not a real top-level directory.
-  const envToken = /(?:^|[\s"'=<>|;(/])([\w.-]*\.env)(?:\.|[\s"'<>|;&)]|$)/;
-  if (envToken.test(cmd)) {
-    return { action: DENY, reason: "read of an .env file" };
+  // TEMPLATE names are excluded by an explicit NAMED-SUFFIX list and nothing
+  // else. `.env.example` and friends hold no secrets -- they are the files a
+  // user is meant to copy FROM -- yet the rule denied them, so it fired on
+  // setup prose and documentation ("copy .env.example to .env"). Because the
+  // exclusion is a fixed list, a real `.env`, `.env.local`, `prod.env` and
+  // `/app/config/prod.env` are all still denied. A bare `.env` mention is still
+  // denied even in prose: that case cannot be told apart from a real read
+  // without parsing the shell, and this layer fails closed.
+  const envToken = /(?:^|[\s"'=<>|;(/])([\w.-]*\.env)(?:\.([\w-]*)|[\s"'<>|;&)]|$)/g;
+  const ENV_TEMPLATE_SUFFIX = /^(?:example|sample|template|dist|defaults|tmpl)$/i;
+  for (let m; (m = envToken.exec(cmd)) !== null; ) {
+    if (!ENV_TEMPLATE_SUFFIX.test(m[2] || "")) {
+      return { action: DENY, reason: "read of an .env file" };
+    }
+  }
+
+  // Account/authentication material, checked on the cd-absolutised command
+  // first (so a working-directory change cannot hide the file) and then on the
+  // raw command (so a bare name is caught even when the `cd` is not leading).
+  const accountSecret = accountSecretInExec(cdAbsolutize(cmd)) || accountSecretInExec(cmd);
+  if (accountSecret) {
+    return {
+      action: DENY,
+      reason: `read of protected account secret material (${accountSecret})`,
+    };
   }
 
   const paths = absolutePathsIn(cmd);
@@ -1122,10 +1267,14 @@ function confirmExec(cmd) {
   }
   const spend = spendAtOrAboveCeiling(maskInert(cmd, inertStmt));
   if (spend.length) {
-    return {
-      action: CONFIRM,
-      reason: `transaction at or above the $${SPEND_CEILING_USD} ceiling ($${spend[0]})`,
-    };
+    // Outbound only (owner ruling 2026-09-21). Unknown direction fails safe.
+    const dir = spendDirection(maskInert(cmd, inertStmt));
+    if (dir !== "inbound") {
+      return {
+        action: CONFIRM,
+        reason: `outbound transaction at or above the $${SPEND_CEILING_USD} ceiling ($${spend[0]})`,
+      };
+    }
   }
   const outside = writeTargetsIn(cmd).filter(
     (p) => isAbsoluteish(p) && !underAny(p, ALLOWED_WRITE_ROOTS),
@@ -1157,7 +1306,7 @@ export function confirmClass(reason) {
   if (/destructive delete \(rm\)|routine cleanup delete/.test(r)) return "delete";
   if (/^destructive git operation/.test(r)) return "git";
   if (/^database drop\/destructive restore/.test(r)) return "db";
-  if (/^transaction at or above/.test(r)) return "spend";
+  if (/^(?:outbound )?transaction at or above/.test(r)) return "spend";
   if (/^write outside the workspace/.test(r)) return "outside-write";
   if (/^read of .* outside the allowlist/.test(r)) return "confirm-read";
   return null;
@@ -1167,10 +1316,10 @@ export function confirmClass(reason) {
  * Classes eligible for session-scoped "Allow for this session".
  *
  * `spend` is deliberately EXCLUDED. A session-wide grant on that class would
- * authorise EVERY later transaction at or above the $500 ceiling, which
- * contradicts the configured hard stop ("any transaction at or above the
- * ceiling escalates to a human *before* it happens"). Those stay strictly
- * one-shot until an operator says otherwise.
+ * authorise EVERY later OUTBOUND expenditure at or above the $500 ceiling, which
+ * contradicts the standing ABC hard stop ("any outbound spend above $500 escalates
+ * to Tony *before* it happens"). Those stay strictly one-shot until the owner
+ * says otherwise.
  */
 export const SESSION_TRUSTABLE_CLASSES = new Set([
   "delete",
@@ -1210,6 +1359,37 @@ function loggedExec(cmd) {
  *
  * @returns {{action: "allow"|"allow-log"|"confirm"|"deny", reason?: string}}
  */
+/** Tools whose params carry text that will be EXECUTED. */
+const EXEC_PAYLOAD_TOOLS = new Set(["exec", "process", "terminal"]);
+
+/**
+ * The text a tool will EXECUTE, wherever it carries it.
+ *
+ * `exec` uses `command`. `terminal` sends `data` into a shell; `process` writes
+ * `data`, `literal`, `text`, or a `keys` array to a running process's stdin.
+ * Reading only `command` made the last two classify as EMPTY -- and an empty
+ * command allows -- so identical bytes got two verdicts depending on which tool
+ * carried them: `exec` denied, `terminal`/`process` allowed. See INCIDENTS.md #23.
+ *
+ * Only EXECUTING actions are read. `list`, `read`, `resize`, `close`, `poll`,
+ * `log`, `kill`, `clear` and `remove` carry no command text and must stay
+ * silent, or ordinary session management would start prompting.
+ */
+function execPayloadOf(tool, params) {
+  const p = params || {};
+  if (tool === "exec") return p.command || p.cmd || p.input || "";
+  if (tool === "terminal") {
+    if (p.action && p.action !== "input") return "";
+    return p.data || p.input || "";
+  }
+  // process: only the stdin-writing actions.
+  if (p.action && !["write", "send-keys", "paste", "submit"].includes(p.action)) {
+    return "";
+  }
+  if (Array.isArray(p.keys)) return p.keys.join(" ");
+  return p.data || p.literal || p.text || p.input || "";
+}
+
 export function classifyToolCall(toolName, params, derivedPaths) {
   const tool = String(toolName || "");
 
@@ -1243,13 +1423,11 @@ export function classifyToolCall(toolName, params, derivedPaths) {
     return classifyReadPath(p);
   }
 
-  if (tool !== "exec" && tool !== "process") {
+  if (!EXEC_PAYLOAD_TOOLS.has(tool)) {
     return { action: ALLOW };
   }
 
-  const cmd = String(
-    (params && (params.command || params.cmd || params.input)) || "",
-  );
+  const cmd = String(execPayloadOf(tool, params) || "");
   if (!cmd.trim()) return { action: ALLOW };
 
   const denied = denyExec(cmd);

@@ -46,6 +46,24 @@ t("cat ssh private key", "exec", { command: "cat /root/.ssh/id_rsa" }, "deny");
 t("ls ssh dir", "exec", { command: "ls /root/.ssh/" }, "deny");
 t("secrets store get", "exec", { command: "openclaw secrets store get TELEGRAM_BOT_TOKEN" }, "deny");
 
+// ═══ INCIDENTS.md #22: account secrets must DENY, never merely CONFIRM ═══
+// /etc/shadow inherited CONFIRM from /etc/passwd via CONFIRM_READ_PARENTS, and
+// CONFIRM is session-trustable -- so ONE `allow-always` made the root password
+// hash readable for the rest of the session. These are DENY, and deny has no
+// approval path. The /etc/passwd case below pins the boundary: world-readable,
+// no secret, still CONFIRM.
+t("cat /etc/shadow denies", "exec", { command: "cat /etc/shadow" }, "deny");
+t("cat /etc/shadow- denies", "exec", { command: "cat /etc/shadow-" }, "deny");
+t("cat /etc/gshadow denies", "exec", { command: "cat /etc/gshadow" }, "deny");
+t("cat /etc/sudoers denies", "exec", { command: "cat /etc/sudoers" }, "deny");
+// The bypass: a leading `cd` named no absolute path, so the file was never seen.
+t("cd /etc && cat shadow denies (cwd bypass)", "exec",
+  { command: "cd /etc && cat shadow" }, "deny");
+t("bare `cat shadow` denies", "exec", { command: "cat shadow" }, "deny");
+// Guard: /etc/passwd is NOT a secret and must stay CONFIRM, not become DENY.
+t("cat /etc/passwd stays confirm (not a secret)", "exec",
+  { command: "cat /etc/passwd" }, "confirm");
+
 // ═══ OWNER TEST 3: approved --allow-host grant must NOT prompt ═══
 t("secrets set approved host", "exec",
   { command: "openclaw secrets store set TEST_KEY --allow-host api.telegram.org" }, "allow-log");
@@ -81,6 +99,32 @@ t("read /var/tmp script", "read", { path: "/var/tmp/x.sh" }, "allow");
 t("exec cat /tmp file", "exec", { command: "cat /tmp/out.txt" }, "allow");
 // ...but the path-anchored secret rules still win inside a scratch root.
 t("read /tmp/.env still denied", "read", { path: "/tmp/app/.env" }, "deny");
+
+// ═══ FINDING 3 (2026-09-21): the .env rule fired on TEMPLATE filenames ═══
+// The rule matched any `*.env*` token, so a TEMPLATE name -- which holds no
+// secrets and is the file a user is told to copy FROM -- was denied on mere
+// mention. It fired on setup prose and documentation ("copy .env.example to
+// .env"), which taught users the guard was noise. Narrow fix: exempt an
+// explicit template-suffix list and NOTHING else, so every real dotenv path
+// still denies. Note the two negatives that pin the boundary -- a bare `.env`
+// is denied even inside template prose, and a template copy whose DESTINATION
+// is a real dotenv is denied, because that command does create one.
+t("template name in prose reads nothing -> allow", "exec",
+  { command: `echo "copy .env.example when ready"` }, "allow");
+t("template path alone -> allow", "exec",
+  { command: `echo "see app/.env.template"` }, "allow");
+t(".env.sample -> allow", "exec",
+  { command: `echo ".env.sample"` }, "allow");
+t("template copy to a non-dotenv path -> allow", "exec",
+  { command: `cp config/app.env.dist /tmp/backup.conf` }, "allow");
+t("bare .env amid template prose -> STILL deny", "exec",
+  { command: `echo "copy .env.example to .env"` }, "deny");
+t("non-template suffix (.env.local) -> deny", "exec",
+  { command: `cat .env.local` }, "deny");
+t("template copy that CREATES a real dotenv -> deny", "exec",
+  { command: `cp config/app.env.dist config/app.env` }, "deny");
+t("prod.env.production -> deny", "exec",
+  { command: `cat /srv/prod.env.production` }, "deny");
 t("exec cat /tmp/id_rsa still denied", "exec", { command: "cat /tmp/id_rsa" }, "deny");
 t("read /root/backups DENIED", "read", { path: "/root/backups/plain/x.tar.zst" }, "deny");
 t("read /etc/passwd CONFIRMS (not denied)", "read", { path: "/etc/passwd" }, "confirm");
@@ -159,9 +203,12 @@ t("git reset", "exec", { command: "git reset --hard HEAD~3" }, "confirm");
 t("git clean -fd", "exec", { command: "git clean -fd" }, "confirm");
 t("drop table", "exec", { command: "sqlite3 app.db 'DROP TABLE users'" }, "confirm");
 t("write outside workspace", "exec", { command: "echo x > /root/other/file.txt" }, "confirm");
-t("spend $500", "exec", { command: "curl https://api.stripe.com/v1/charges -d amount=50000" }, "confirm");
-t("spend $600 amount field", "exec",
-  { command: "curl https://api.stripe.com/v1/payment_intents -d amount=60000" }, "confirm");
+// NOTE (2026-09-21): these target OUTBOUND endpoints. They previously used
+// /charges and /payment_intents, which are COLLECTIONS -- inbound revenue, which
+// no longer escalates. See the SPEND DIRECTION block at the end of this file.
+t("spend $500 outbound (transfer)", "exec", { command: "curl https://api.stripe.com/v1/transfers -d amount=50000" }, "confirm");
+t("spend $600 amount field (payout)", "exec",
+  { command: "curl https://api.stripe.com/v1/payouts -d amount=60000" }, "confirm");
 t("spend under ceiling", "exec",
   { command: "curl https://api.stripe.com/v1/charges -d amount=100" }, "allow-log");
 // RULING CHANGED (rule 7): a displayed amount is prose, not a transaction.
@@ -506,9 +553,9 @@ t("DROP TABLE piped into sqlite3 confirms", "exec",
 t("echo 'amount=60000' does not confirm", "exec",
   { command: "echo 'amount=60000'" }, "allow");
 t("curl -d quoted amount=60000 confirms", "exec",
-  { command: "curl -d 'amount=60000' https://api.stripe.com/v1/payment_intents" }, "confirm");
+  { command: "curl -d 'amount=60000' https://api.stripe.com/v1/transfers" }, "confirm");
 t("curl -d double-quoted amount confirms", "exec",
-  { command: 'curl -d "amount=60000" https://api.stripe.com/v1/payment_intents' }, "confirm");
+  { command: 'curl -d "amount=60000" https://api.stripe.com/v1/transfers' }, "confirm");
 
 // ═══ BOOTSTRAP EXEMPTION must fire in denyExec too (design rule 4) ═══
 // The exemption was applied in classifyToolCall and in confirmExec, but NOT in
@@ -579,6 +626,9 @@ t("rm -rf /etc still denies (root rule unchanged)", "exec",
 //       as a governance attack.
 //   (b) FALSE NEGATIVE — the real tree under any OTHER name was unprotected. This
 //       suite passed 220/0 when extracted as `ai-security-force` and failed 218/2
+//       (`ai-security-force` was the directory name when this defect existed; it
+//       was later renamed to `nibvok-ai-security`. The old name is intrinsic to
+//       the finding -- the rule matched that literal -- so it is kept verbatim.)
 //       when extracted as `package`, because the two system-delete negatives in
 //       this file were matching the NAME, not the delete. They passed for the
 //       wrong reason (the #6/#11 shape).
@@ -630,6 +680,71 @@ t("rm single file in /tmp still auto-allows (recorded)", "exec",
   { command: "rm /tmp/scratch.txt" }, "allow-log");
 t("a path that merely CONTAINS a system dir name is not a system path", "exec",
   { command: "rm -f /root/.openclaw/workspace/project/etc-passwd-notes.md" }, "confirm");
+
+// ═══ SPEND DIRECTION: revenue arriving is not expenditure ═══
+// Owner decision 2026-09-21: the ABC $500 hard stop covers OUTBOUND spend only.
+// The rule exists to prevent unapproved EXPENDITURE; receiving money is not
+// expenditure. Inbound revenue therefore must not escalate. Direction is read
+// from the endpoint the command targets, and an UNKNOWN shape fails safe
+// (escalates) rather than assuming inbound.
+//
+// These tests FAIL on the pre-fix classifier, which was direction-blind and
+// escalated all three inbound cases below. Proof: prove-spend-direction.mjs.
+t("INBOUND $999 revenue (charges) does not escalate", "exec",
+  { command: "curl https://api.stripe.com/v1/charges -d amount=99900" }, "allow-log");
+t("INBOUND $999 revenue (checkout session) does not escalate", "exec",
+  { command: "curl https://api.stripe.com/v1/checkout/sessions -d amount=99900" }, "allow-log");
+t("INBOUND $999 revenue (payment intent) does not escalate", "exec",
+  { command: "curl https://api.stripe.com/v1/payment_intents -d amount=99900" }, "allow-log");
+// OUTBOUND must still escalate -- the guardrail is narrowed, not removed.
+t("OUTBOUND $999 transfer still escalates", "exec",
+  { command: "curl https://api.stripe.com/v1/transfers -d amount=99900" }, "confirm");
+t("OUTBOUND $999 payout still escalates", "exec",
+  { command: "curl https://api.stripe.com/v1/payouts -d amount=99900" }, "confirm");
+t("OUTBOUND $999 refund still escalates", "exec",
+  { command: "curl https://api.stripe.com/v1/refunds -d amount=99900" }, "confirm");
+// An unnamed endpoint can't be shown to be inbound, so it fails safe.
+t("UNKNOWN $999 vendor still escalates (fail safe)", "exec",
+  { command: "curl https://vendor.example.com/buy -d amount=99900" }, "confirm");
+
+// ═══ INCIDENTS.md #23: `terminal` and `process` EXECUTE text too ═══
+// `exec` denials were reachable one tool over: `terminal` input and `process`
+// stdin writes carry their payload in data/literal/text, not `command`, so the
+// classifier read an empty command and allowed it. Same bytes, same shell,
+// different verdict. These are governed as exec now.
+const SHADOW = "/etc/" + "sha" + "dow";
+t("terminal input: cat shadow denies", "terminal",
+  { action: "input", sessionId: "t1", data: "cat " + SHADOW }, "deny");
+t("terminal input: rm -rf / denies", "terminal",
+  { action: "input", sessionId: "t1", data: "rm -rf /" }, "deny");
+t("terminal input: cat secrets.json denies", "terminal",
+  { action: "input", sessionId: "t1", data: "cat /root/.openclaw/secrets.json" }, "deny");
+t("terminal input: cat .env denies", "terminal",
+  { action: "input", sessionId: "t1", data: "cat .env" }, "deny");
+t("terminal input: forced push confirms", "terminal",
+  { action: "input", sessionId: "t1", data: "git push --force" }, "confirm");
+t("terminal input: ordinary work allows", "terminal",
+  { action: "input", sessionId: "t1", data: "git status" }, "allow");
+t("terminal list is not an execution", "terminal",
+  { action: "list" }, "allow");
+t("terminal read (buffer) is not an execution", "terminal",
+  { action: "read", sessionId: "t1" }, "allow");
+t("terminal resize is not an execution", "terminal",
+  { action: "resize", sessionId: "t1", cols: 80, rows: 24 }, "allow");
+t("process write: cat shadow denies", "process",
+  { action: "write", sessionId: "p1", data: "cat " + SHADOW }, "deny");
+t("process send-keys literal denies", "process",
+  { action: "send-keys", sessionId: "p1", literal: "rm -rf /" }, "deny");
+t("process send-keys keys[] denies", "process",
+  { action: "send-keys", sessionId: "p1", keys: ["rm", "-rf", "/"] }, "deny");
+t("process paste denies", "process",
+  { action: "paste", sessionId: "p1", text: "cat " + SHADOW }, "deny");
+t("process write: ordinary work allows", "process",
+  { action: "write", sessionId: "p1", data: "git status" }, "allow");
+t("process poll is not an execution", "process",
+  { action: "poll", sessionId: "p1" }, "allow");
+t("process kill is not an execution", "process",
+  { action: "kill", sessionId: "p1" }, "allow");
 
 console.log(`\n${nOk} passed, ${fail} failed`);
 if (failures.length) {

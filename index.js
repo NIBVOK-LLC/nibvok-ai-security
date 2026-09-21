@@ -148,6 +148,7 @@ export default definePluginEntry({
         matcher: [
           "exec",
           "process",
+          "terminal",
           "read",
           "ls",
           "write",

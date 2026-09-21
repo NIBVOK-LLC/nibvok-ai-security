@@ -47,7 +47,9 @@ const CMDS = {
   db: "sqlite3 a.db 'DROP TABLE u'",
   "outside-write": "echo x > /root/other/f.txt",
   "confirm-read": "cat /etc/passwd",
-  spend: "curl https://api.stripe.com/v1/charges -d amount=60000",
+  // OUTBOUND (2026-09-21): /charges is a COLLECTION -- inbound revenue, which no
+  // longer escalates. The spend class itself is unchanged.
+  spend: "curl https://api.stripe.com/v1/transfers -d amount=60000",
 };
 
 const evt = (cls, sessionKey) => ({
