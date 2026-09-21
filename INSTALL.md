@@ -67,8 +67,8 @@ that still reports `enabled` — the exact failure in INCIDENTS.md #6.
 All three run without a Gateway, a restart, or a live tool call:
 
 ```bash
-node test-classifier.mjs      # expect: 236 passed, 0 failed
-node test-hook.mjs            # expect: 21 passed, 0 failed
+node test-classifier.mjs      # expect: 274 passed, 0 failed
+node test-hook.mjs            # expect: 29 passed, 0 failed
 node test-session-trust.mjs   # expect: 27 passed, 0 failed
 ```
 
@@ -199,8 +199,8 @@ audit lines means the hook is not running**, even if §5.1 looked healthy.
 
 ```
 [ ] SDK import resolves                      node -e "import('openclaw/plugin-sdk/plugin-entry')..."
-[ ] test-classifier.mjs   236 passed
-[ ] test-hook.mjs          21 passed (or exit 3 without the SDK)
+[ ] test-classifier.mjs   274 passed
+[ ] test-hook.mjs          29 passed (or exit 3 without the SDK)
 [ ] test-session-trust.mjs  27 passed (or exit 3 without the SDK)
 [ ] plugins.load.paths points at the directory
 [ ] plugins enable <id>        → enabled

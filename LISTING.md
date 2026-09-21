@@ -4,7 +4,7 @@
 confirmed, or denied *before* it runs.**
 
 Version `0.1.0` · Plugin id `nibvok-ai-security` · Category `security`
-Zero-config · One hook · 284 tests
+Zero-config · One hook · 330 tests
 
 ---
 
@@ -12,7 +12,7 @@ Zero-config · One hook · 284 tests
 
 **Description** — 92 characters (limit 120):
 
-> Runtime enforcement for OpenClaw agents. Allow, confirm, or deny every tool call. 284 tests.
+> Runtime enforcement for OpenClaw agents. Allow, confirm, or deny every tool call. 330 tests.
 
 > An earlier draft of this line ended *"Hash-chained audit trail."* **That claim
 > is false and was removed.** There is no hash chain; see *What it honestly does
@@ -89,12 +89,12 @@ log, so the reasoning is reviewable after the fact rather than inferred.
 
 ## Proof
 
-The behaviour is covered by **284 tests** across three suites:
+The behaviour is covered by **330 tests** across three suites:
 
 | Suite | Tests | Covers |
 |---|---|---|
-| `test-classifier.mjs` | 236 | decision logic, path/host/spend classification, deny and confirm rules |
-| `test-hook.mjs` | 21 | hook registration, decision mapping, approval and audit wiring |
+| `test-classifier.mjs` | 274 | decision logic, path/host/spend classification, deny and confirm rules |
+| `test-hook.mjs` | 29 | hook registration, decision mapping, approval and audit wiring |
 | `test-session-trust.mjs` | 27 | session-scoped trust: grant, scope, and restart expiry |
 
 Run them yourself:
@@ -105,7 +105,19 @@ node test-hook.mjs
 node test-session-trust.mjs
 ```
 
-The package also ships **eighteen case studies** (`INCIDENTS.md`) — real
+`test-classifier.mjs` always runs. The other two import the plugin entry, which
+needs the OpenClaw SDK on the module path — from a bare clone they exit **3** with
+a `SKIPPED` message instead of crashing. To run all three:
+
+```bash
+mkdir -p node_modules
+ln -sfn /usr/lib/node_modules/openclaw node_modules/openclaw
+```
+
+Exit `3` means *could not run*, and is deliberately distinct from exit `1`
+(*ran and failed*).
+
+The package also ships **twenty-one case studies** (`INCIDENTS.md`) — real
 failures found while building and running this layer, each of which changed the
 code or the process. They are kept because the *reasoning* is the reusable part.
 Several are failures *of verification itself*: a policy that reported healthy

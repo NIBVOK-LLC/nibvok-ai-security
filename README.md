@@ -126,9 +126,11 @@ Three suites, runnable without a Gateway:
 
 | Suite | What it proves | Result |
 |---|---|---|
-| `node test-classifier.mjs` | decision logic per rule | **236 passed** |
-| `node test-hook.mjs` | the real registered handler returns block / approval / allow | **21 passed** |
+| `node test-classifier.mjs` | decision logic per rule | **274 passed** |
+| `node test-hook.mjs` | the real registered handler returns block / approval / allow | **29 passed** |
 | `node test-session-trust.mjs` | class-scoped session trust is bounded correctly | **27 passed** |
+
+**330 tests** across the three suites.
 
 `test-classifier.mjs` is self-contained. The other two import `index.js`, which
 imports the OpenClaw plugin SDK that the **host** supplies — so from a bare clone
@@ -194,4 +196,4 @@ Contact: data@nibvok.com
 - **[INSTALL.md](INSTALL.md)** — install on a new instance
 - **[LISTING.md](LISTING.md)** — ClawHub listing copy and search phrases
 - **[SCREENSHOTS.md](SCREENSHOTS.md)** — provenance of each screenshot
-- **[INCIDENTS.md](INCIDENTS.md)** — eighteen case studies from real failures; #10 was caught by its own negative test before it shipped
+- **[INCIDENTS.md](INCIDENTS.md)** — twenty-one case studies from real failures; #10 was caught by its own negative test before it shipped

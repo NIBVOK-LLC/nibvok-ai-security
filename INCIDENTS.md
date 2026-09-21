@@ -1,4 +1,4 @@
-# INCIDENTS.md — eighteen case studies
+# INCIDENTS.md — twenty-one case studies
 
 Failures found while building and running this layer. Each one changed the code
 or the process. They are kept because the *reasoning* is the reusable part.
@@ -197,11 +197,20 @@ Three green. Reported as passing.
 **What was actually true.** The policy was **not running at all.**
 
 ```
-plugins.entries.ai-security-force → { "enabled": false }
+plugins.entries.ox88-governance → { "enabled": false }
 ```
 
 Disabled by config at **16:14:13** and **16:17:05**; the next restart loaded
-**15 plugins, without `ai-security-force`**.
+**15 plugins, without `ox88-governance`**.
+
+> **Naming note.** `ox88-governance` was the plugin's id **at the time of this
+> incident**. The layer was renamed twice after it: `ox88-governance` →
+> `ai-security-force` (2026-09-20, `0c3f0ff`), then `ai-security-force` →
+> `nibvok-ai-security` (2026-09-21, `949f9f4`). The key is left as it actually
+> was, because an incident log that renames its own artifacts stops being a
+> record of what happened. Contemporaneous evidence rather than memory: the
+> audit log entry at `2026-09-18T17:25:38Z` — mid-investigation, two days before
+> the first rename — queries `plugins.entries.ox88-governance`.
 
 **Why the tests lied.** Two independent failures compounded:
 
@@ -273,14 +282,14 @@ The mechanism is credential **shadowing**, not a typo:
   environment as a run-scoped sentinel (`oc-sent-v2…`).
 - `load_dotenv(override=False)` lets the ambient environment WIN over the `.env`
   file, so the sentinel shadowed the correct plaintext value.
-- The sentinel resolved to the OLD account (`acct_OLD…REDACTED`); the price
-  ids live in the CURRENT one (`acct_CURRENT…REDACTED`).
+- The sentinel resolved to the OLD account (`acct_REDACTED_1`); the price
+  ids live in the CURRENT one (`acct_REDACTED_3`).
 
 The first fix was `_local_secret()` in `app/utils/config.py`: prefer the real
 `.env` plaintext over a sentinel. **That edit is load-bearing and must not be
 reverted** — it is why the app works today. Verified on this host: the configured
-key now resolves to `acct_CURRENT…REDACTED` (expected), while the sentinel still
-resolves to `acct_OLD…REDACTED` (old) through the proxy.
+key now resolves to `acct_REDACTED_3` (expected), while the sentinel still
+resolves to `acct_REDACTED_1` (old) through the proxy.
 
 **Why the first fix was not enough.** "Prefer `.env` over the sentinel" is a rule
 about ORDERING. It cannot tell you the key that survived is the RIGHT one. A
@@ -529,7 +538,7 @@ of environment, and its failure message names the offending price. It cannot be
 satisfied by the policy being wrong in the same direction the config moved.
 
 > **Redaction note.** The two Stripe account identifiers in this entry
-> have been replaced with `acct_OLD…REDACTED` / `acct_CURRENT…REDACTED`. The
+> have been replaced with `acct_REDACTED_1` / `acct_REDACTED_3`. The
 > credential-shadowing lesson does not depend on the literal ids.
 
 ### The pattern
@@ -907,6 +916,11 @@ ask the tool itself what it can do.
 
 ## #19 — The name-anchored tamper rule: a guard that protected a filename, not the tree
 
+> **Naming note.** The plugin directory was named `ai-security-force` when this
+defect existed; it was later renamed to `nibvok-ai-security`. The old name is
+**intrinsic to the case** — the rule was anchored on that literal string — so it
+is kept verbatim here. Only the surrounding description uses the current name.
+
 **Class:** governance gap (string-anchored enumeration) · **Detected by:** installing the built artifact under a different directory name and re-running the suite shipped inside it · **Origin:** the **agent** — found while packaging, not by the analyst · reported 2026-09-20
 
 ### What happened
@@ -1111,6 +1125,222 @@ Never leave the working tree in the reverted state.
 
 ---
 
+## #21 — The template that looked like a secret: a rule that fired on the filename
+
+**Class:** policy bug · **Detected by:** writing the deny-boundary regression test
+· **Origin:** the agent · **Date:** 2026-09-21
+
+### What happened
+
+The `.env` read rule matched a **token shape**, not a decision:
+
+```js
+const envToken = /(?:^|[\s"'=<>|;(/])([\w.-]*\.env)(?:\.|[\s"'<>|;&)]|$)/;
+if (envToken.test(cmd)) {
+  return { action: DENY, reason: "read of an .env file" };
+}
+```
+
+`[\w.-]*\.env` matches the substring `.env` inside **any** word carrying it. So
+`.env.example` — a **template**, the file a user is told to copy *from*, which
+holds no secret — was denied on mere mention. The rule fired on setup prose:
+
+```bash
+echo "copy .env.example to .env to get started"   # -> DENY
+```
+
+This is **#3**'s shape again, in the one place #3 claimed to have fixed: the rule
+judged a **spelling** instead of resolving what the command touches. A guard that
+blocks the instruction telling a user how to configure the product is noise — and
+noise is what teaches people to route around a guard.
+
+### What was NOT the defect
+
+The report that led here attributed **295 denies in three days** — every 15
+minutes, the keepalive's login check — to this false positive. That attribution
+was **wrong**, and checking it was the part that mattered.
+
+The denied commands were read out of the audit log rather than assumed:
+
+```bash
+PW=$(grep -m1 '^DEMO_ACCOUNT_PASSWORD=' app/creator-automation-backend/.env ...)
+```
+
+That command names a **real dotenv path**. Denying it is **correct enforcement** —
+the classifier was doing its job. The distinction that resolved it: a grep
+**pattern** printed on its own is allowed, but the same pattern *followed by a
+dotenv filename* is a genuine read. Two commands that look alike in a summary
+line, on opposite sides of the boundary.
+
+So the classifier did not cause the keepalive's failure. The cause was that the
+helper script was **mode 644 — not executable** — so it could never be invoked
+directly, and the job's prompt pasted the read inline instead. The denies were a
+symptom of the job's shape, not of a misfiring rule.
+
+### The fix
+
+Exempt an explicit **template-suffix list** and nothing else:
+
+```js
+const ENV_TEMPLATE_SUFFIX = /^(?:example|sample|template|dist|defaults|tmpl)$/i;
+```
+
+A fixed list is what keeps the narrowing from becoming a bypass: `.env`,
+`.env.local`, `prod.env` and `/app/config/prod.env` all still deny. The two
+boundaries that matter are pinned by **negatives**, not by the positive case
+alone:
+
+| Command | Decision | Why |
+|---|---|---|
+| `echo "copy .env.example when ready"` | **allow** | template; reads nothing |
+| `cp config/app.env.dist /tmp/backup.conf` | **allow** | template source, non-secret destination |
+| `echo "copy .env.example to .env"` | **deny** | names a real `.env` |
+| `cp config/app.env.dist config/app.env` | **deny** | the destination **becomes** a dotenv |
+| `cat .env.local` | **deny** | non-template suffix |
+| `cat /srv/prod.env.production` | **deny** | `prod.env` plus suffix |
+
+A bare `.env` stays denied **even inside template prose**. That case cannot be
+told apart from a real read without parsing the shell, and this layer fails
+closed — so it keeps denying, and the false-positive surface is narrowed only
+where the filename itself proves the file holds no secret.
+
+### The pre-fix proof
+
+Per the standing method, the test was watched to **fail on the unfixed code**:
+
+| Step | Result |
+|---|---|
+| Revert source | `git show HEAD:.../classifier.js` — the committed pre-fix file, md5 `907f8461a4ef` |
+| Suite against reverted code | **240 passed, 4 failed**, exit 1 |
+| Failures | exactly the four "template must be allowed" cases |
+| Deny-side cases | all still passed on the reverted code — the fix narrows one path, not six |
+| Restore + checksum | md5 `a7cf163fd04c95…` matches the backup; suite **244 passed, 0 failed** |
+
+The four failures **are** the proof. A test written after the fix that only ever
+passed would have proven nothing.
+
+### The pattern
+
+**Two rules, one lesson.** #19 protected a filename; this one judged a spelling.
+Both fired on text that merely *resembled* the guarded thing, and each
+over-reached on what the command actually does.
+
+**And a second, less comfortable one:** the defect was real but it was *not* the
+one reported. The reported symptom — a keepalive that silently stopped checking —
+had a different cause entirely (a non-executable script). Accepting the report's
+attribution would have shipped a correct fix for the wrong problem **and** left
+the login check broken. The reproduction is what separated them.
+
+---
+
+## #22 — The inherited confirm: a password hash that shared a tier with passwd
+
+**Class:** governance gap · **Detected by:** auditing which paths inherit
+`/etc/passwd`'s tier · **Origin:** the agent · **Date:** 2026-09-21
+
+### What happened
+
+`/etc/passwd` is deliberately placed at **CONFIRM**, not DENY. That is correct: it
+is world-readable and holds no secret. The rule that does it is a *parent* rule —
+`/etc/` is in `CONFIRM_READ_PARENTS`.
+
+`/etc/shadow` sits under `/etc/`, so it **inherited that same CONFIRM** — and it
+holds the **root password hash**.
+
+The tier is what made it a leak. CONFIRM is *session-trustable*:
+
+```js
+export const SESSION_TRUSTABLE_CLASSES = new Set([
+  "delete", "git", "db", "outside-write", "confirm-read",  // <-- here
+]);
+```
+
+So the sequence was:
+
+| Step | Result |
+|---|---|
+| `cat /etc/passwd` | confirm (correct — no secret) |
+| operator answers `allow-always` | class `confirm-read` trusted for the session |
+| `cat /etc/shadow` | **confirmed silently, no prompt** — the hash is now readable |
+
+One approval, intended for a file with no secret in it, silently covered the
+password file for the rest of the session. **A rule that inherits is a rule that
+leaks.** The decision was never made about `/etc/shadow`; it arrived by
+containment.
+
+### A second, independent hole in the same rule
+
+Reviewing the path rule exposed a bypass that had nothing to do with tiers. The
+absolute-path deny matches `/etc/shadow` **as a string**. A working-directory
+change names no absolute path at all:
+
+```bash
+cd /etc && cat shadow     # -> ALLOW. The string "/etc/shadow" never appears.
+cat shadow                # -> ALLOW. Same.
+```
+
+So even after the tier fix, a command could reach the file by not spelling it.
+Measured behaviour, live plugin, 2026-09-21:
+
+| Command | Pre-fix | Post-fix |
+|---|---|---|
+| `cat /etc/shadow` | confirm · trustable **YES** | **deny** |
+| `cd /etc && cat shadow` | **allow** | **deny** |
+| `cat shadow` | **allow** | **deny** |
+| `cat /etc/gshadow` | confirm · trustable YES | **deny** |
+| `cat /etc/sudoers` | confirm · trustable YES | **deny** |
+| `cat /etc/passwd` | confirm | confirm (**unchanged**) |
+
+### The fix
+
+Two mechanisms, because there were two holes.
+
+1. **Deny the names in the deny list, not the confirm parents.** `/etc/shadow`,
+   `/etc/shadow-`, `/etc/gshadow`, `/etc/master.passwd`, `/etc/sudoers`,
+   `/etc/sudoers.d/`, `ssh_host_*_key`. They are **deliberately not added to
+   `READ_EXCEPTIONS`**, so no exemption can re-open them. DENY has no approval
+   path, so session trust can never reach them again.
+2. **Match the path SEGMENT, not only the absolute path** — so `cd /etc && cat
+   shadow` and a bare `cat shadow` are caught. A leading `cd`/`pushd` is rewritten
+   to an absolute base (`cdAbsolutize`) so the ordinary path rules can classify
+   what follows.
+
+A bare name is denied **even in prose**, for the same reason the `.env` rule
+denies a bare `.env`: this layer is pure and lexical, a mention cannot be told
+apart from a read without parsing the shell, and it fails closed. Unlike #21's
+`.env.example`, every name here genuinely holds secret material.
+
+### The pre-fix proof
+
+Per the standing method, the new regression tests were watched to **fail on the
+unfixed code** (the committed `HEAD` classifier, in both trees):
+
+| Tree | Pre-fix | Post-fix |
+|---|---|---|
+| live (`governance-plugin/`) | **228 passed, 6 failed** | **234 passed, 0 failed** |
+| package (`packages/…/`) | **249 passed, 9 failed** | **258 passed, 0 failed** |
+
+The failures are exactly the six deny cases above; the package tree adds the three
+inbound-spend cases from the spend-direction port. `cat /etc/passwd stays
+confirm` passes **both** pre- and post-fix — it pinches the boundary, proving the
+fix denies secrets without over-denying the non-secret file that shares their
+parent.
+
+### The pattern
+
+#19 protected a filename; #21 judged a spelling; this one **inherited a decision
+it was never given**. The guarded thing was never named in the rule at all — it
+arrived by `startsWith("/etc/")`. Containment is inferential, and a tier that is
+safe for a world-readable file is not automatically safe for its neighbour.
+
+**The second half is the sharper lesson:** making `/etc/shadow` DENY would still
+have left `cd /etc && cat shadow` reading it. Fixing the tier without fixing the
+*match* would have shipped a fix that reads as complete, is testable as passing,
+and leaves the file reachable. Two holes, two mechanisms — and only the pre-fix
+run shows whether you got both.
+
+---
+
 ## Summary
 
 | # | Failure | Class | Detection |
@@ -1133,6 +1363,8 @@ Never leave the working tree in the reverted state.
 | 18 | A deny list that covered the config verbs but not `config patch` | governance gap | reading the rule against the CLI's own subcommands |
 | 19 | A tamper rule anchored on the directory NAME, not the path | governance gap | installing the built artifact under a different name |
 | 20 | A system-file mutation the write rule could not see | governance gap | comparing equivalent mutations of one file |
+| 21 | A `.env` rule that fired on template filenames | policy bug | writing the deny-boundary regression test |
+| 22 | `/etc/shadow` inherited CONFIRM from `/etc/passwd`, and CONFIRM is session-trustable | governance gap | auditing the tier inheritance |
 
 Bugs #1–#3 were found by a human noticing the guard was unusable. #4 was found by
 reading the code. #5 needed a file-mtime check. #6 needed a control on a file
@@ -1148,3 +1380,77 @@ method: the pre-fix proof*).
 detection requires someone to *look somewhere unexpected* — a timestamp, a
 non-existent file, an audit log that stayed silent. Every one of those is now an
 explicit check in INSTALL.md.
+
+---
+
+## #23 — The unclassified tool path: `terminal` and `process` executed what `exec` denied
+
+**Class:** governance gap (uncovered tool surface) · **Detected by:** running the
+plugin's own registered handler against synthetic `terminal`/`process` events
+while auditing the `/etc/shadow` tier · **Origin:** the agent · **Date:** 2026-09-21
+
+### What happened
+
+`exec` denied `cat /etc/shadow`. The same bytes, sent through a different tool,
+were **allowed**:
+
+| call | verdict before the fix |
+|---|---|
+| `exec` → `cat /etc/shadow` | **deny** |
+| `terminal` → input `cat /etc/shadow` | **allow** |
+| `process` → write `cat /etc/shadow` | **allow** |
+
+Nothing was wrong with the classifier's rules. The bytes never reached them.
+There were **two independent halves**, and fixing either one alone would have left
+the hole open.
+
+**Half one — the hook never ran.** The handler is registered with a `matcher`
+list naming the tools it is called for. `terminal` was not in it, so a terminal
+call was never classified at all. This is invisible from inside the classifier:
+no rule is missing, no test fails, and the audit log simply has no entry — the
+same shape as **#6**, where an unenforced layer still reported healthy.
+
+**Half two — the payload field was wrong.** `process` *was* in the matcher, but
+the classifier read the command from `params.command`. `process` and `terminal`
+carry their text in `data`, `literal`, `text`, or `keys`. So the command read as
+an **empty string** — and an empty command is allowed by design. The rule was
+fine; the input it was handed was always blank.
+
+### Why it is this class
+
+The policy covered one *route* to an action and not the others. It is the same
+family as the write-tool gap already handled in `classifyToolCall` (write, edit
+and apply_patch never pass through the exec path), and as **#3** and **#19**: a
+guard that matches a *spelling* of an action rather than the action itself. A
+deny that any sibling tool can route around is a deny in one dialect only.
+
+### The fix
+
+- `terminal` added to the hook `matcher`, so the handler is invoked at all.
+- Payload extraction moved into `execPayloadOf(tool, params)`, which reads the
+  field each tool actually uses, and only for **executing** actions. `list`,
+  `read`, `resize`, `close`, `poll`, `log`, `kill`, `clear` and `remove` carry no
+  command text and stay silent, so ordinary session management never prompts.
+
+`terminal` input and `process` stdin writes are now governed **as exec**: same
+deny, same confirm, same allow. A platform-level prompt for terminal input exists
+and is unchanged — this is defence in depth, not a replacement for it.
+
+### Verification — pre-fix proof
+
+The regression tests were run against the **unfixed** code first, then the fix was
+reverted faithfully and the failure reproduced, then restored (checksum-matched):
+
+| stage | classifier | hook |
+|---|---|---|
+| pre-fix | 241 passed, **9 failed** | 26 passed, **3 failed** |
+| post-fix | **274 passed, 0 failed** | **29 passed, 0 failed** |
+| reverted (faithful) | 241 / 9 | 26 / 3 |
+| restored | **274 / 0** | **29 / 0** |
+
+### Lesson
+
+**A guard is only as wide as the surface it is wired to.** Enumerate the tools
+that can perform the action, not just the one you were thinking of — and prove
+the wiring, not only the rule. A hook that is never called and a rule that is
+always handed an empty string both look exactly like a healthy policy.
