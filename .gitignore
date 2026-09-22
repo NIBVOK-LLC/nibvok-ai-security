@@ -1,5 +1,2 @@
 node_modules/
 *.tgz
-
-# Raw API payloads are derived and re-fetchable within the 14-day window.
-traffic/raw/

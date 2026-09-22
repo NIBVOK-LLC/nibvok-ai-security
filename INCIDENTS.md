@@ -1,4 +1,4 @@
-# INCIDENTS.md — twenty-one case studies
+# INCIDENTS.md — twenty-two case studies
 
 Failures found while building and running this layer. Each one changed the code
 or the process. They are kept because the *reasoning* is the reusable part.
@@ -1454,3 +1454,84 @@ reverted faithfully and the failure reproduced, then restored (checksum-matched)
 that can perform the action, not just the one you were thinking of — and prove
 the wiring, not only the rule. A hook that is never called and a rule that is
 always handed an empty string both look exactly like a healthy policy.
+
+---
+
+## #24 — MCP tool calls were never classified: the matcher hid an entire tool family
+
+**Class:** governance gap (uncovered tool surface, by hook scoping rather than by rule)
+· **Detected by:** auditing which tools the `before_tool_call` hook can reach at all
+· **Origin:** the agent · **Date:** 2026-09-22 · **Fixed:** 2026-09-22
+
+### What happened
+
+Every tool call from an MCP server (`mcp.servers`) executed **ungoverned**. No rule
+was wrong; the rules were never consulted.
+
+MCP tools reach the model as `<server>__<tool>` (two underscores). The hook was
+registered with an **exact-name matcher** listing twelve core tool ids. Matching is
+exact and case-insensitive, and the framework rejects wildcards (*"Omission is the
+only match-all form"*), so no MCP name ever matched — the handler did not run, and
+`classifyToolCall` was never called for those calls.
+
+The audit log agreed: across 2,105 decisions, distinct `tool` values were `exec`,
+`read`, `conversations_send`, `terminal`, `process` — and **zero** MCP entries.
+
+### Why it is this class
+
+Same shape as #23, one level down. #23 was "a rule that always receives a narrow
+argument"; this is "a hook that is never called at all". Both look exactly like a
+healthy policy from the inside — the suites were green, the handler was correct, and
+the coverage was zero. **The wiring was the bug, not the logic.**
+
+### The fix
+
+Two changes, shipped together because either alone is worse than neither:
+
+1. **Omit the hook matcher** (the only match-all form). Omitting it alone would have
+   been worse than the gap: an MCP name is chosen by a third-party server, so every
+   MCP call would then have landed on the unknown-*core*-tool `allow` default.
+2. **Classify MCP names in the handler, failing closed.** The server half is validated
+   against owner-configured `mcp.servers` (using the framework's own sanitize /
+   truncate / collision-suffix algorithm, ported); the tool half and all arguments are
+   treated as untrusted. Unclassifiable MCP call → **confirm**, never allow.
+
+Supporting decisions: `mcp-unknown` is **not** session-trustable (same reasoning that
+excludes `spend`); the approval prompt names the tool instead of rendering a blank
+`Command: `; and a throw during MCP parsing is caught and returns **confirm** — because
+the framework runs a throwing hook with `failOpen`, so an uncaught exception would
+have *allowed* the call.
+
+### Verification
+
+| stage | classifier | hook |
+|---|---|---|
+| before | 274 passed | 29 passed |
+| after | **288 passed, 0 failed** | **38 passed, 0 failed** |
+
+Six negative controls (`controls-mcp-governance.sh`) each reintroduce one defect into
+a fresh copy and require the suite to go red: matcher restored · unknown MCP tool
+allows · MCP names unrecognised · `mcp-unknown` made session-trustable · unrecognised
+server treated as configured · MCP prompt renders blank. **CONTROLS ALL CORRECT**
+(baseline green, A–F red), in both trees.
+
+### Two harness bugs found in the controls themselves
+
+Both are the recurring class, and both would have produced a *reassuring* wrong answer:
+
+1. An earlier version joined the mutation's old/new text with a **NUL sentinel**. Bash
+   silently drops NUL from a variable, so every mutation reported "anchor missing" —
+   six refusals that looked like six correct controls.
+2. The fresh copy carried a hand-picked file list, so the published tree's suites died
+   on `MODULE_NOT_FOUND` (`policies.js` missing) and reported **6 correct, 2 wrong** —
+   the two "wrong" ones being the baseline, failing for a reason unrelated to the
+   mutation. **A control that errors is not a control**, and a count like "6/8" invites
+   the reader to assume near-success.
+
+### Lesson
+
+**Auditing a rule set is not auditing its reach.** Enumerate what the hook can *see*
+before trusting what it decides. And when a matcher is the gate, remember that a
+family of tools whose names are chosen by someone else can never be enumerated into an
+allowlist — the correct answer is to widen the hook and narrow the default, in that
+order and in the same change.

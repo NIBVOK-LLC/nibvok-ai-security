@@ -152,13 +152,17 @@ Five suites, runnable without a Gateway:
 
 | Suite | What it proves | Result |
 |---|---|---|
-| `node test-classifier.mjs` | decision logic per rule | **274 passed** |
-| `node test-hook.mjs` | the real registered handler returns block / approval / allow | **29 passed** |
+| `node test-classifier.mjs` | decision logic per rule | **288 passed** |
+| `node test-hook.mjs` | the real registered handler returns block / approval / allow | **38 passed** |
 | `node test-session-trust.mjs` | class-scoped session trust is bounded correctly | **27 passed** |
 | `node test-audit-chain.mjs` | a modified audit entry breaks the hash chain | **18 passed** |
 | `node test-policies.mjs` | each of the five preset postures behaves as documented | **15 passed** |
 
-**363 tests** across five suites.
+**386 tests** across five suites.
+
+Six negative controls (`bash controls-mcp-governance.sh`) prove the MCP checks
+can fail: each reintroduces one defect into a fresh copy and requires the suite to
+go red. Baseline green, A–F red — because a check that cannot fail is not a check.
 
 `test-classifier.mjs` is self-contained. The other two import `index.js`, which
 imports the OpenClaw plugin SDK that the **host** supplies — so from a bare clone
@@ -186,6 +190,16 @@ Stated plainly, because a guard that overstates itself is worse than none:
 - **No timestamp access.** The rule *"a secret created in the last 60 minutes"*
   is **not implemented**. A pure classifier has no access to entry timestamps.
   Implementing it needs a state lookup, which breaks the purity property.
+- **MCP tool calls are governed (since 2026-09-22).** Tools from an
+  `mcp.servers` server arrive as `<server>__<tool>`, which this layer's earlier
+  hook matcher did not match — so those calls were **not classified at all**
+  until 2026-09-22. The matcher is now omitted and MCP names are classified in
+  the handler, with unclassifiable calls failing **closed** (confirm). History and
+  evidence: **[docs/MCP-GAP.md](docs/MCP-GAP.md)**.
+- **No MCP schema fingerprinting.** Because no plugin-facing API exposes an MCP
+  server's tool list or schemas, this layer **cannot** detect a "rug pull" — a
+  server changing a tool's definition after the agent has learned it. Stated
+  rather than implied; see **[docs/MCP-GAP.md](docs/MCP-GAP.md)**.
 - **Configuration is by environment variable, not a policy file.** Deployment
   roots (`ASF_ARTIFACT_ROOT`, `ASF_LOG_ROOT`, `ASF_WORKSPACE_ROOT`,
   `NIBVOK_AI_SECURITY_PLUGIN_ROOT`, `NIBVOK_AI_SECURITY_SPEND_CEILING_USD`) are overridable; the rule *set*
@@ -194,7 +208,7 @@ Stated plainly, because a guard that overstates itself is worse than none:
 ## Install
 
 ```bash
-openclaw plugins enable nibvok-ai-security
+openclaw plugins install clawhub:@nibvok-llc/nibvok-ai-security
 openclaw gateway restart
 ```
 
@@ -226,4 +240,4 @@ Contact: data@nibvok.com
 - **[INSTALL.md](INSTALL.md)** — install on a new instance
 - **[LISTING.md](LISTING.md)** — ClawHub listing copy and search phrases
 - **[SCREENSHOTS.md](SCREENSHOTS.md)** — provenance of each screenshot
-- **[INCIDENTS.md](INCIDENTS.md)** — twenty-one case studies from real failures; #10 was caught by its own negative test before it shipped
+- **[INCIDENTS.md](INCIDENTS.md)** — twenty-two case studies from real failures; #10 was caught by its own negative test before it shipped, #23 found that `terminal`/`process` executed what `exec` denied, and #24 that a hook matcher had hidden every MCP tool call from this layer entirely

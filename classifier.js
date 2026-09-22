@@ -1346,6 +1346,10 @@ export function confirmClass(reason) {
   if (/^(?:outbound )?transaction at or above/.test(r)) return "spend";
   if (/^write outside the workspace/.test(r)) return "outside-write";
   if (/^read of .* outside the allowlist/.test(r)) return "confirm-read";
+  // MCP: a call we could not classify. Deliberately NOT added to
+  // SESSION_TRUSTABLE_CLASSES below -- an unknown third-party capability must
+  // not become a session-wide grant, for the same reason `spend` is excluded.
+  if (/^MCP tool /.test(r)) return "mcp-unknown";
   return null;
 }
 
@@ -1391,6 +1395,180 @@ function loggedExec(cmd) {
 // Entry point
 // ────────────────────────────────────────────────────────────
 
+// ────────────────────────────────────────────────────────────
+// MCP tools
+//
+// A tool from an MCP server reaches the model as `<server>__<tool>` (TWO
+// underscores), built by the framework's `buildSafeToolName`. No core tool id
+// contains `__`, so the shape is unambiguous.
+//
+// These calls were previously NOT governed at all: the hook was matcher-gated
+// to a list of core tool ids, so this handler never ran for an MCP call (see
+// INCIDENTS.md). The matcher is now omitted and this branch decides. The
+// default for an MCP call we cannot classify is CONFIRM, never allow — the name
+// is chosen by a third-party server, so it must NOT inherit the unknown-CORE-
+// tool allow below.
+//
+// Trust model (owner decision 2026-09-22): the SERVER half is validated against
+// the owner's configured `mcp.servers` (owner-controlled). The TOOL half — and
+// every argument — is server-chosen and handled as untrusted input throughout.
+// It selects which rule set runs; it never authorizes anything.
+
+/** Reserved first-party bridge prefix; never a third-party server. */
+const MCP_RESERVED_PREFIX = "mcp__openclaw__";
+const MCP_SEPARATOR = "__";
+const MCP_SERVER_MAX_PREFIX = 30;
+const MCP_NAME_UNSAFE_RE = /[^A-Za-z0-9_-]/g;
+
+/**
+ * Port of the framework's `sanitizeToolFragment` (agent-bundle-mcp-names).
+ *
+ * Kept faithful on purpose: the runtime name is derived from this algorithm and
+ * a drifted derivation would match the wrong server — or none — which is a
+ * silently unenforced policy rather than a visible failure.
+ */
+function mcpSanitizeFragment(raw, fallback, maxChars) {
+  const normalized = String(raw || "").trim().replace(MCP_NAME_UNSAFE_RE, "-") || fallback;
+  const providerSafe = /^[A-Za-z]/.test(normalized) ? normalized : `${fallback}-${normalized}`;
+  if (!maxChars) return providerSafe;
+  return providerSafe.length > maxChars ? providerSafe.slice(0, maxChars) : providerSafe;
+}
+
+/**
+ * Port of `assignSafeServerNames`: the runtime safe name is sanitized,
+ * truncated to 30 characters, and COLLISION-SUFFIXED (`-2`, `-3`) against the
+ * full declared set in declaration order.
+ *
+ * It therefore depends on a server's SIBLINGS, not just on itself — deriving it
+ * from one config key in isolation is wrong when two servers sanitize to the
+ * same base. That is why this walks the whole set.
+ */
+export function deriveSafeServerNames(serverNames) {
+  const used = new Set();
+  const assigned = new Map();
+  for (const raw of serverNames || []) {
+    const base = mcpSanitizeFragment(raw, "mcp", MCP_SERVER_MAX_PREFIX);
+    let candidate = base;
+    let n = 2;
+    while (used.has(candidate.toLowerCase())) {
+      const suffix = `-${n}`;
+      candidate = `${base.slice(0, Math.max(1, MCP_SERVER_MAX_PREFIX - suffix.length))}${suffix}`;
+      n += 1;
+    }
+    used.add(candidate.toLowerCase());
+    assigned.set(String(raw), candidate);
+  }
+  return assigned;
+}
+
+/**
+ * Split an MCP tool name into its server and tool halves, or null if it is not
+ * an MCP name.
+ *
+ * Mirrors the framework's own consume-side parse: for an `mcp__`-prefixed name
+ * the first separator belongs to the reserved prefix, so the search starts
+ * after it. Gateway names are `<server>__<tool>`; the native harness uses
+ * `mcp__<server>__<tool>`.
+ */
+export function splitMcpToolName(toolName) {
+  const name = String(toolName || "");
+  if (!name.includes(MCP_SEPARATOR)) return null;
+  const start = name.startsWith("mcp__") ? 5 : 0;
+  const i = name.indexOf(MCP_SEPARATOR, start);
+  if (i < 0) return null;
+  return {
+    serverHalf: name.slice(0, i),
+    toolHalf: name.slice(i + MCP_SEPARATOR.length),
+  };
+}
+
+/** Argument keys that conventionally carry a filesystem path in an MCP tool. */
+const MCP_PATH_KEYS = new Set([
+  "path", "paths", "file", "files", "filepath", "filepaths",
+  "source", "src", "destination", "dest", "target",
+  "dir", "directory", "folder",
+]);
+
+/**
+ * Direction hints read from the TOOL half of the name.
+ *
+ * A HINT only. The name is server-supplied, so it selects which rule set runs —
+ * it never lowers scrutiny, and an unrecognised verb resolves to "unknown",
+ * which is classified against BOTH rule sets (see classifyMcpCall).
+ */
+const MCP_READ_VERB = /(^|[^a-z])(read|get|list|search|find|stat|info|tree|cat|fetch|view|show|query|describe)([^a-z]|$)/;
+const MCP_WRITE_VERB = /(^|[^a-z])(write|create|edit|move|rename|delete|remove|mkdir|rmdir|copy|append|update|put|patch|set|replace|insert|truncate|chmod|chown)([^a-z]|$)/;
+
+/** Every path-shaped argument in an MCP call, arrays expanded. */
+function mcpPathsIn(params) {
+  const out = [];
+  if (!params || typeof params !== "object") return out;
+  for (const [key, value] of Object.entries(params)) {
+    if (!MCP_PATH_KEYS.has(String(key).toLowerCase())) continue;
+    if (typeof value === "string" && value) out.push(value);
+    else if (Array.isArray(value)) {
+      for (const item of value) if (typeof item === "string" && item) out.push(item);
+    }
+  }
+  return out;
+}
+
+/** read / write / null (unknown or ambiguous => classify strictly). */
+function mcpDirection(toolHalf) {
+  const t = String(toolHalf || "");
+  const reads = MCP_READ_VERB.test(t);
+  const writes = MCP_WRITE_VERB.test(t);
+  if (writes && !reads) return "write";
+  if (reads && !writes) return "read";
+  return null;
+}
+
+/**
+ * Classify one MCP call. Never throws: a thrown hook handler fails OPEN in the
+ * framework (`onHandlerError(..., failOpen)`), so every path here must return a
+ * decision rather than raise.
+ */
+function classifyMcpCall(toolName, parts, params, mcpServers) {
+  const safeNames = deriveSafeServerNames(mcpServers);
+  const known = new Set(Array.from(safeNames.values(), (n) => n.toLowerCase()));
+  const serverKnown = known.has(String(parts.serverHalf).toLowerCase());
+  const serverNote = serverKnown ? "" : " from an unrecognised MCP server";
+
+  // OpenClaw's own loopback bridge. Reserved so a third party cannot claim it,
+  // but still never waved through on the strength of a name prefix.
+  if (String(toolName).startsWith(MCP_RESERVED_PREFIX)) {
+    return { action: CONFIRM, reason: `MCP tool ${toolName} is a reserved first-party bridge call` };
+  }
+
+  const paths = mcpPathsIn(params);
+  if (paths.length) {
+    const direction = mcpDirection(parts.toolHalf);
+    let result;
+    if (direction === "write") {
+      result = worstAction(paths.map(classifyWritePath));
+    } else if (direction === "read") {
+      result = worstAction(paths.map(classifyReadPath));
+    } else {
+      // Direction is server-supplied and unrecognised: take the STRICTER of both
+      // readings rather than guess. A silent allow is not an option.
+      const both = [...paths.map(classifyWritePath), ...paths.map(classifyReadPath)];
+      result = worstAction(both);
+      if (result.action === ALLOW || result.action === ALLOW_LOG) {
+        return { action: CONFIRM, reason: `MCP tool ${toolName} path direction is unclassified` };
+      }
+    }
+    // An unrecognised server never gets a silent allow, even on a path the rules
+    // would otherwise permit: config presence is what is validated, not safety.
+    if (!serverKnown && (result.action === ALLOW || result.action === ALLOW_LOG)) {
+      return { action: CONFIRM, reason: `MCP tool ${toolName} is from an unrecognised MCP server` };
+    }
+    return result;
+  }
+
+  // Nothing classifiable in the arguments -> fail closed.
+  return { action: CONFIRM, reason: `MCP tool ${toolName} has no path-shaped argument${serverNote}` };
+}
+
 /**
  * Classify one tool call.
  *
@@ -1427,7 +1605,7 @@ function execPayloadOf(tool, params) {
   return p.data || p.literal || p.text || p.input || "";
 }
 
-export function classifyToolCall(toolName, params, derivedPaths) {
+export function classifyToolCall(toolName, params, derivedPaths, mcpServers) {
   const tool = String(toolName || "");
 
   // Outbound messaging: allowed, but always recorded.
@@ -1458,6 +1636,24 @@ export function classifyToolCall(toolName, params, derivedPaths) {
     const p = (params && (params.path || params.file)) || "";
     if (!p) return { action: ALLOW };
     return classifyReadPath(p);
+  }
+
+  // MCP tools (`<server>__<tool>`): third-party-chosen names, so they must NOT
+  // inherit the unknown-CORE-tool allow below. Fail closed instead.
+  //
+  // The try/catch is load-bearing: the framework runs a throwing hook handler
+  // with `failOpen`, so an exception here would ALLOW the call. A bug in MCP
+  // parsing must degrade to CONFIRM (fail closed), never to allow.
+  const mcpParts = splitMcpToolName(tool);
+  if (mcpParts) {
+    try {
+      return classifyMcpCall(tool, mcpParts, params, mcpServers);
+    } catch (e) {
+      return {
+        action: CONFIRM,
+        reason: `MCP tool ${tool} could not be classified (${(e && e.name) || "error"})`,
+      };
+    }
   }
 
   if (!EXEC_PAYLOAD_TOOLS.has(tool)) {

@@ -1,6 +1,6 @@
 // Unit tests for the NIBVOK AI Security classifier.
 // Run: node test-classifier.mjs
-import { classifyToolCall, BOOTSTRAP_ROOT, ARTIFACT_ROOT, LOG_ROOT } from "./classifier.js";
+import { classifyToolCall, confirmClass, SESSION_TRUSTABLE_CLASSES, BOOTSTRAP_ROOT, ARTIFACT_ROOT, LOG_ROOT } from "./classifier.js";
 
 // The plugin's own directory, derived from where this file lives — not a
 // hardcoded host path — so the bootstrap-exemption tests follow the tree to
@@ -745,6 +745,64 @@ t("process poll is not an execution", "process",
   { action: "poll", sessionId: "p1" }, "allow");
 t("process kill is not an execution", "process",
   { action: "kill", sessionId: "p1" }, "allow");
+
+// ═══ MCP TOOLS (governed since 2026-09-22) ═══
+// Before this, MCP tool calls never reached the classifier at all: the hook was
+// matcher-gated to core tool ids. Now the matcher is omitted and MCP names are
+// classified here, failing CLOSED for anything unclassifiable.
+const MCP_SERVERS = ["startupnamegenerator", "my.server", "filesystem"];
+
+function tm(label, tool, params, expected) {
+  const got = classifyToolCall(tool, params, undefined, MCP_SERVERS).action;
+  if (got === expected) { nOk++; return; }
+  fail++;
+  failures.push(`${label}\n     expected=${expected} got=${got}`);
+}
+
+// The core guarantee: an unknown MCP tool is CONFIRM, never allow. An unknown
+// CORE tool is still allow (the next line is the regression guard for that).
+tm("unknown MCP tool -> confirm (fail closed)", "probe2__do_thing", {}, "confirm");
+tm("unknown CORE tool -> still allow", "some_future_core_tool", {}, "allow");
+
+// Path-bearing MCP calls reuse the existing path corpus unchanged.
+tm("MCP read of a secret -> deny", "filesystem__read_text_file",
+  { path: "/root/.ssh/id_rsa" }, "deny");
+tm("MCP read of an allowed path -> allow", "filesystem__read_text_file",
+  { path: "/root/.openclaw/workspace/ox88/README.md" }, "allow");
+
+// A DENY is NEVER weakened by an unrecognised server: deny is a deny.
+tm("unrecognised server, denied path -> still deny", "ghostserver__read_text_file",
+  { path: "/root/.ssh/id_rsa" }, "deny");
+
+// A DENIED path must deny on EVERY element, not just the first.
+tm("MCP read_multiple_files: 2nd path denied -> deny", "filesystem__read_multiple_files",
+  { paths: ["/root/.openclaw/workspace/ox88/README.md", "/root/.ssh/id_rsa"] }, "deny");
+tm("MCP move_file: source denied -> deny", "filesystem__move_file",
+  { source: "/root/.ssh/id_rsa", destination: "/tmp/x" }, "deny");
+
+// Direction is read from the server-chosen tool half, so a name we cannot
+// resolve is classified against BOTH rule sets and strictest wins.
+tm("MCP write outside workspace -> confirm", "filesystem__write_file",
+  { path: "/root/other/f.txt" }, "confirm");
+
+// A known server gets no silent allow on an unclassifiable call either.
+tm("known server, no path-shaped arg -> confirm", "startupnamegenerator__ping",
+  {}, "confirm");
+tm("unrecognised server, allowed path -> confirm (never silent allow)",
+  "ghostserver__read_text_file", { path: "/root/.openclaw/workspace/x.md" }, "confirm");
+
+// The reserved first-party bridge is never waved through on its name alone.
+tm("reserved mcp__openclaw__ bridge -> confirm", "mcp__openclaw__read", {}, "confirm");
+
+// Spoofing: a hostile server naming a tool `exec` gets `srv__exec`, which must
+// NOT be classified by the exec rules (it has no command) -- it fails closed.
+tm("spoofed exec name -> confirm, not exec rules", "evil__exec", {}, "confirm");
+
+// Session trust must NOT cover the MCP class.
+if (!SESSION_TRUSTABLE_CLASSES.has("mcp-unknown")) nOk++;
+else { fail++; failures.push("mcp-unknown must NOT be session-trustable"); }
+if (confirmClass("MCP tool x__y has no path-shaped argument") === "mcp-unknown") nOk++;
+else { fail++; failures.push("confirmClass must map the MCP reason to mcp-unknown"); }
 
 console.log(`\n${nOk} passed, ${fail} failed`);
 if (failures.length) {

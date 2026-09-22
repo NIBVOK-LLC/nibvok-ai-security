@@ -12,8 +12,14 @@
 // The guard below turns that into an actionable message and a DIFFERENT exit
 // code (3 = environment, 1 = test failure), so "could not run" can never be
 // mistaken for "ran and passed" or "ran and failed".
+import { useTempAuditLog } from "./test-audit-env.mjs";
+
 let plugin, BOOTSTRAP_ROOT;
 try {
+  // Own a throwaway audit log BEFORE importing the plugin. `index.js` resolves
+  // its audit path at import time, so an override applied afterwards is too
+  // late and the fixtures land in a real log. See INCIDENTS.md #25.
+  useTempAuditLog();
   plugin = (await import("./index.js")).default;
   ({ BOOTSTRAP_ROOT } = await import("./classifier.js"));
 } catch (err) {
@@ -32,7 +38,11 @@ try {
 const BOOT = BOOTSTRAP_ROOT.replace(/\/$/, "");
 
 const registered = [];
-const fakeApi = { on: (name, fn, opts) => registered.push({ name, fn, opts }) };
+const fakeApi = {
+  on: (name, fn, opts) => registered.push({ name, fn, opts }),
+  // Owner-configured MCP servers, as the handler reads them at register time.
+  config: { mcp: { servers: { startupnamegenerator: {}, filesystem: {} } } },
+};
 plugin.register(fakeApi);
 
 const h = registered.find((r) => r.name === "before_tool_call");
@@ -87,14 +97,67 @@ t("terminal input: cat shadow blocks", { toolName: "terminal", params: { action:
 t("process write: cat shadow blocks", { toolName: "process", params: { action: "write", sessionId: "p1", data: "cat /etc/" + "sha" + "dow" } }, "block");
 t("terminal input: ordinary work allows", { toolName: "terminal", params: { action: "input", data: "git status" } }, "allow");
 
-// The hook only runs for tools its matcher NAMES. A tool absent from the list is
-// never classified at all -- the other half of the #23 gap.
-const matcher = (h.opts && h.opts.matcher) || [];
-console.log("\nMATCHER COVERAGE (a tool not listed is never classified):");
-for (const tool of ["exec", "process", "terminal", "read", "write"]) {
-  const present = matcher.includes(tool);
-  present ? nOk++ : fail++;
-  console.log(`  ${present ? "PASS" : "FAIL"}  matcher covers ${tool}`);
+// The hook used to be matcher-gated to a list of core tool ids, which meant a
+// tool NOT in the list was never classified at all -- and MCP tool names cannot
+// be listed ahead of time (discovered at connect, and able to change). The
+// matcher is now OMITTED, which is the only match-all form the framework allows
+// (`"*"` is rejected; omission is the sole match-all).
+//
+// Asserting the field alone proves the edit, not the consequence. This mirrors
+// the framework's own filter (`pluginToolMatcherCoversTool`) so the test proves
+// MCP calls actually REACH the handler -- which is the whole point of the change.
+function reachesHandler(matcher, toolName) {
+  return matcher === undefined || matcher.includes(String(toolName).toLowerCase());
+}
+const matcher = h.opts && h.opts.matcher;
+console.log("\nMATCHER REMOVED (so every tool, including MCP, reaches the handler):");
+if (matcher === undefined) { nOk++; console.log("  PASS  no matcher -> match-all"); }
+else { fail++; console.log(`  FAIL  matcher still present: ${JSON.stringify(matcher)}`); }
+for (const tool of ["exec", "read", "terminal", "filesystem__read_text_file", "startupnamegenerator__do_thing"]) {
+  const ok = reachesHandler(matcher, tool);
+  ok ? nOk++ : fail++;
+  console.log(`  ${ok ? "PASS" : "FAIL"}  ${tool} reaches the handler`);
+}
+
+console.log("\nMCP TOOLS (the gap this change closes):");
+// Unknown MCP tool, no classifiable argument -> approval (fail closed).
+t("unknown MCP tool", { toolName: "startupnamegenerator__do_thing", params: {} }, "approval");
+// Path rules apply unchanged underneath.
+t("MCP read of a secret", { toolName: "filesystem__read_text_file", params: { path: "/root/.ssh/id_rsa" } }, "block");
+t("MCP read of an allowed path", { toolName: "filesystem__read_text_file", params: { path: "/root/.openclaw/workspace/ox88/README.md" } }, "allow");
+// A hostile server cannot reach the exec rules by naming its tool `exec`.
+t("MCP tool named exec is not exec", { toolName: "evil__exec", params: {} }, "approval");
+// The reserved first-party bridge is never waved through on its name alone.
+t("reserved bridge call", { toolName: "mcp__openclaw__read", params: {} }, "approval");
+// An unrecognised server gets no silent allow.
+t("unrecognised server, allowed path", { toolName: "ghost__read_text_file", params: { path: "/root/.openclaw/workspace/ox88/README.md" } }, "approval");
+
+// The prompt must be legible: an MCP call has no `params.command`, so a naive
+// description would render "Command: " blank and the operator would be
+// approving nothing they can read.
+const mcpPrompt = (() => {
+  const r = h.fn({ toolName: "startupnamegenerator__do_thing", params: {} }) || {};
+  return (r.requireApproval && r.requireApproval.description) || "";
+})();
+if (mcpPrompt.includes("startupnamegenerator__do_thing") && !/Command:\s*$/.test(mcpPrompt)) {
+  nOk++;
+  console.log("  PASS  MCP approval prompt names the tool (not a blank command)");
+} else {
+  fail++;
+  console.log(`  FAIL  MCP approval prompt is uninformative: ${JSON.stringify(mcpPrompt)}`);
+}
+
+// MCP-unknown must not be offered session-wide trust on "allow-always".
+const mcpDecisions = (() => {
+  const r = h.fn({ toolName: "startupnamegenerator__do_thing", params: {} }) || {};
+  return (r.requireApproval && r.requireApproval.allowedDecisions) || [];
+})();
+if (!mcpDecisions.includes("allow-always")) {
+  nOk++;
+  console.log("  PASS  MCP-unknown is one-shot (no allow-always)");
+} else {
+  fail++;
+  console.log("  FAIL  MCP-unknown offered allow-always (session-wide grant)");
 }
 
 console.log(`\n${nOk} passed, ${fail} failed`);

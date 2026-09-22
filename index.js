@@ -11,7 +11,7 @@
 // rewrite runtime behavior at request time." Enforcement lives here.
 import { appendFileSync, readFileSync } from "node:fs";
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
-import { classifyToolCall, confirmClass, SESSION_TRUSTABLE_CLASSES } from "./classifier.js";
+import { classifyToolCall, confirmClass, SESSION_TRUSTABLE_CLASSES, splitMcpToolName } from "./classifier.js";
 import { GENESIS, entryHash, lastHashOfText } from "./audit-chain.js";
 
 /**
@@ -42,6 +42,36 @@ const PRODUCT = "nibvok";
  * remember. Turning a deny into a confirm is a separate policy decision.
  */
 const sessionTrust = new Map(); // sessionKey -> Set<class>
+
+/**
+ * The owner-configured MCP server names (`mcp.servers`), read at register time.
+ *
+ * The classifier validates a call's SERVER half against this set. It is the one
+ * half an untrusted server cannot choose, so it is the only half that may select
+ * policy. Only NAMES are read — never server URLs, headers or credentials.
+ *
+ * Deliberately NO reload registration: `api.registerReload` takes a descriptor
+ * object (`restartPrefixes`/`hotPrefixes`/`noopPrefixes`), not a callback, and
+ * passing the wrong shape can throw inside `register()` — which would take the
+ * whole governance layer offline. Adding a server needs a Gateway restart, and
+ * an unknown server fails CLOSED in the meantime (see classifyMcpCall), so the
+ * failure mode is a prompt rather than a silent allow.
+ */
+let mcpServerNames = [];
+
+function refreshMcpServers(api) {
+  try {
+    const servers = api?.config?.mcp?.servers;
+    mcpServerNames = servers && typeof servers === "object" ? Object.keys(servers) : [];
+  } catch {
+    mcpServerNames = [];
+  }
+}
+
+function configuredMcpServers(api) {
+  if (!mcpServerNames.length) refreshMcpServers(api);
+  return mcpServerNames;
+}
 
 function hasSessionTrust(sessionKey, cls) {
   if (!sessionKey || !cls) return false;
@@ -94,6 +124,7 @@ export default definePluginEntry({
   name: "NIBVOK AI Security",
   description: "Allow, confirm, or deny every tool call before it runs.",
   register(api) {
+    refreshMcpServers(api);
     api.on(
       "before_tool_call",
       (event, ctx) => {
@@ -101,8 +132,16 @@ export default definePluginEntry({
           event.toolName,
           event.params,
           event.derivedPaths,
+          configuredMcpServers(api),
         );
-        const cmd = String((event.params && event.params.command) || "").slice(0, 400);
+        // Text that identifies WHAT is being acted on. `exec` carries `command`;
+        // an MCP call carries neither a command nor a path in that field, so the
+        // tool name is used instead — otherwise every MCP prompt would render
+        // "Command: " blank and the operator would approve nothing legible.
+        const isMcp = !!splitMcpToolName(event.toolName);
+        const cmd = isMcp
+          ? `MCP tool ${event.toolName}`
+          : String((event.params && event.params.command) || "").slice(0, 400);
         const sessionKey = ctx?.sessionKey || event.sessionKey;
         const cls = confirmClass(reason);
         const sessionScoped = !!cls && SESSION_TRUSTABLE_CLASSES.has(cls);
@@ -163,20 +202,12 @@ export default definePluginEntry({
         return undefined; // allow
       },
       {
-        matcher: [
-          "exec",
-          "process",
-          "terminal",
-          "read",
-          "ls",
-          "write",
-          "edit",
-          "apply_patch",
-          "patch",
-          "conversations_send",
-          "conversations_turn",
-          "sessions_send",
-        ],
+        // NO matcher. Omission is the only match-all form (the framework rejects
+        // `"*"`), and MCP tool names cannot be listed ahead of time: they are
+        // discovered from the remote server at connect time and can change
+        // between connects. Omitting the matcher is what lets this handler see
+        // MCP calls at all — until 2026-09-22 it did not, and every MCP tool call
+        // was executed ungoverned. See INCIDENTS.md and MCP-GAP.md.
         priority: 50,
       },
     );

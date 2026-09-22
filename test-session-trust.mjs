@@ -13,8 +13,11 @@
 // root; the raw error is an ERR_MODULE_NOT_FOUND from inside index.js, which looks
 // like a plugin bug. Exit 3 = environment could not run it, distinct from 1 =
 // a real test failure, so "could not run" is never read as a result.
+import { useTempAuditLog } from "./test-audit-env.mjs";
 let plugin, confirmClass, SESSION_TRUSTABLE_CLASSES;
 try {
+  // Own a throwaway audit log BEFORE importing the plugin (see #25).
+  useTempAuditLog();
   plugin = (await import("./index.js")).default;
   ({ confirmClass, SESSION_TRUSTABLE_CLASSES } = await import("./classifier.js"));
 } catch (err) {
