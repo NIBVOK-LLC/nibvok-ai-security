@@ -33,7 +33,7 @@ separate written statement of work.
 | **Policy Setup** (one-time) | engagement to configure the enforcement layer for the customer's environment | not a guarantee that any particular action will be allowed or denied |
 | **Managed Audit** (monthly) | review of the customer's audit trail, with a written report each period | not continuous monitoring, and not a substitute for the customer's own review |
 | **Incident Response** (per incident) | investigation and remediation support after an event | not a warranty that an incident will be contained, or that a recurrence is impossible |
-| **Enterprise Policy Pack** (one-time) | multi-environment policy set with fleet-wide rollout guidance | not a guarantee of any particular action's outcome |
+| **Multi-Environment Pack** (one-time) | multi-environment policy set with fleet-wide rollout guidance | not a guarantee of any particular action's outcome |
 
 Every engagement is **advisory and bounded**: the applicable statement of work states
 the included hours and the environments covered. Work outside that scope is quoted
@@ -48,7 +48,7 @@ separately before it is performed.
   | Policy Setup | $499, one-time |
   | Managed Audit | $199 per month |
   | Incident Response | $500 per incident |
-  | Enterprise Policy Pack | contact `data@nibvok.com` for pricing |
+  | Multi-Environment Pack | $1,499, one-time |
 
 - **Billing cycle:** one-time services are invoiced on completion; Managed Audit is
   invoiced monthly in advance.
