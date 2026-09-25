@@ -48,7 +48,7 @@ separately before it is performed.
   | Policy Setup | $499, one-time |
   | Managed Audit | $199 per month |
   | Incident Response | $500 per incident |
-  | Multi-Environment Pack | $1,499, one-time |
+  | Multi-Environment Pack | contact `data@nibvok.com` for pricing |
 
 - **Billing cycle:** one-time services are invoiced on completion; Managed Audit is
   invoiced monthly in advance.
