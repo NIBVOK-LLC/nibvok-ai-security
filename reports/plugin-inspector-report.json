@@ -1,64 +1,21 @@
 {
   "generatedAt": "deterministic",
   "targetOpenClaw": {
-    "configuredPath": "npm:openclaw@2026.9.5",
+    "configuredPath": "npm:openclaw@2026.9.8",
     "searchedPaths": [
-      "npm:openclaw@2026.9.5"
+      "npm:openclaw@2026.9.8"
     ],
     "status": "ok",
-    "version": "2026.9.5",
+    "version": "2026.9.8",
     "compatRegistryPath": null,
     "compatRecordCount": 0,
     "compatRecords": [],
     "compatRecordStatuses": {},
-    "hookTypesPath": "dist/api-DArLOVCi.d.ts",
-    "hookNameCount": 42,
-    "hookNames": [
-      "after_compaction",
-      "after_tool_call",
-      "agent_end",
-      "agent_turn_prepare",
-      "before_agent_finalize",
-      "before_agent_reply",
-      "before_agent_run",
-      "before_compaction",
-      "before_dispatch",
-      "before_install",
-      "before_message_write",
-      "before_model_resolve",
-      "before_prompt_build",
-      "before_reset",
-      "before_tool_call",
-      "channel_pairing_requested",
-      "cron_changed",
-      "cron_reconciled",
-      "gateway_start",
-      "gateway_stop",
-      "heartbeat_prompt_contribution",
-      "inbound_claim",
-      "llm_input",
-      "llm_output",
-      "message_received",
-      "message_sending",
-      "message_sent",
-      "model_call_ended",
-      "model_call_started",
-      "reply_dispatch",
-      "reply_payload_sending",
-      "resolve_exec_env",
-      "session_end",
-      "session_start",
-      "skill_changed",
-      "skill_proposal_changed",
-      "skill_proposal_evaluate",
-      "subagent_delivery_target",
-      "subagent_ended",
-      "subagent_progress",
-      "subagent_spawned",
-      "tool_result_persist"
-    ],
-    "apiBuilderPath": "dist/agent-harness-runtime-D1Ww9PgY.d.ts",
-    "apiRegistrarCount": 57,
+    "hookTypesPath": "dist/channel-core-DsgKN1pZ.d.ts",
+    "hookNameCount": 0,
+    "hookNames": [],
+    "apiBuilderPath": "dist/agent-harness-runtime-y6jiaaqJ.d.ts",
+    "apiRegistrarCount": 58,
     "apiRegistrars": [
       "registerAgentEventSubscription",
       "registerAgentHarness",
@@ -74,8 +31,9 @@
       "registerConfigMigration",
       "registerContextEngine",
       "registerControlUiDescriptor",
-      "registerDetachedTaskRuntime",
+      "registerDecisionProvider",
       "registerEmbeddingProvider",
+      "registerGatewayAccessPolicy",
       "registerGatewayDiscoveryService",
       "registerGatewayMethod",
       "registerHook",
@@ -118,8 +76,8 @@
       "registerWidgetPresenter",
       "registerWorkerProvider"
     ],
-    "capturedRegistrationPath": "dist/agent-harness-runtime-D1Ww9PgY.d.ts",
-    "capturedRegistrarCount": 57,
+    "capturedRegistrationPath": "dist/agent-harness-runtime-y6jiaaqJ.d.ts",
+    "capturedRegistrarCount": 58,
     "capturedRegistrars": [
       "registerAgentEventSubscription",
       "registerAgentHarness",
@@ -135,8 +93,9 @@
       "registerConfigMigration",
       "registerContextEngine",
       "registerControlUiDescriptor",
-      "registerDetachedTaskRuntime",
+      "registerDecisionProvider",
       "registerEmbeddingProvider",
+      "registerGatewayAccessPolicy",
       "registerGatewayDiscoveryService",
       "registerGatewayMethod",
       "registerHook",
@@ -180,7 +139,7 @@
       "registerWorkerProvider"
     ],
     "packagePath": "package.json",
-    "sdkExportCount": 341,
+    "sdkExportCount": 352,
     "sdkExports": [
       "openclaw/plugin-sdk/access-groups",
       "openclaw/plugin-sdk/account-core",
@@ -194,15 +153,18 @@
       "openclaw/plugin-sdk/acp-runtime-backend",
       "openclaw/plugin-sdk/agent-core",
       "openclaw/plugin-sdk/agent-harness",
+      "openclaw/plugin-sdk/agent-harness-attempt-runtime",
+      "openclaw/plugin-sdk/agent-harness-completion",
       "openclaw/plugin-sdk/agent-harness-exec-review-runtime",
       "openclaw/plugin-sdk/agent-harness-registration",
       "openclaw/plugin-sdk/agent-harness-runtime",
-      "openclaw/plugin-sdk/agent-harness-task-runtime",
+      "openclaw/plugin-sdk/agent-harness-session-runtime",
       "openclaw/plugin-sdk/agent-harness-tool-runtime",
       "openclaw/plugin-sdk/agent-media-payload",
       "openclaw/plugin-sdk/agent-runtime",
       "openclaw/plugin-sdk/agent-scope-runtime",
       "openclaw/plugin-sdk/agent-sessions",
+      "openclaw/plugin-sdk/agent-workspace-runtime",
       "openclaw/plugin-sdk/allow-from",
       "openclaw/plugin-sdk/allowlist-config-edit",
       "openclaw/plugin-sdk/approval-auth-runtime",
@@ -262,6 +224,7 @@
       "openclaw/plugin-sdk/cli-argv",
       "openclaw/plugin-sdk/cli-backend",
       "openclaw/plugin-sdk/cli-runtime",
+      "openclaw/plugin-sdk/code-mode-executor-runtime",
       "openclaw/plugin-sdk/codex-mcp-projection",
       "openclaw/plugin-sdk/codex-session-transcript-runtime",
       "openclaw/plugin-sdk/collection-runtime",
@@ -279,12 +242,14 @@
       "openclaw/plugin-sdk/config-runtime",
       "openclaw/plugin-sdk/context-visibility-runtime",
       "openclaw/plugin-sdk/control-ui",
+      "openclaw/plugin-sdk/control-ui-link-reader",
       "openclaw/plugin-sdk/conversation-binding-inspection-runtime",
       "openclaw/plugin-sdk/conversation-binding-runtime",
       "openclaw/plugin-sdk/conversation-runtime",
       "openclaw/plugin-sdk/core",
       "openclaw/plugin-sdk/cron-store-runtime",
       "openclaw/plugin-sdk/dangerous-name-runtime",
+      "openclaw/plugin-sdk/decisions",
       "openclaw/plugin-sdk/dedupe-runtime",
       "openclaw/plugin-sdk/delivery-queue-runtime",
       "openclaw/plugin-sdk/device-bootstrap",
@@ -336,6 +301,7 @@
       "openclaw/plugin-sdk/llm",
       "openclaw/plugin-sdk/logging-core",
       "openclaw/plugin-sdk/markdown-table-runtime",
+      "openclaw/plugin-sdk/media-ffmpeg",
       "openclaw/plugin-sdk/media-generation-runtime",
       "openclaw/plugin-sdk/media-local-roots",
       "openclaw/plugin-sdk/media-mime",
@@ -433,6 +399,7 @@
       "openclaw/plugin-sdk/realtime-voice",
       "openclaw/plugin-sdk/realtime-voice-activation",
       "openclaw/plugin-sdk/realtime-voice-audio-queue",
+      "openclaw/plugin-sdk/realtime-voice-playback",
       "openclaw/plugin-sdk/realtime-voice-provider",
       "openclaw/plugin-sdk/reply-chunking",
       "openclaw/plugin-sdk/reply-dispatch-runtime",
@@ -455,6 +422,7 @@
       "openclaw/plugin-sdk/runtime-group-policy",
       "openclaw/plugin-sdk/runtime-store",
       "openclaw/plugin-sdk/sandbox",
+      "openclaw/plugin-sdk/secret-egress-runtime",
       "openclaw/plugin-sdk/secret-file",
       "openclaw/plugin-sdk/secret-file-runtime",
       "openclaw/plugin-sdk/secret-input",
@@ -501,6 +469,7 @@
       "openclaw/plugin-sdk/temp-path",
       "openclaw/plugin-sdk/text-autolink-runtime",
       "openclaw/plugin-sdk/text-chunking",
+      "openclaw/plugin-sdk/text-grapheme",
       "openclaw/plugin-sdk/text-utility-runtime",
       "openclaw/plugin-sdk/thread-bindings-runtime",
       "openclaw/plugin-sdk/thread-bindings-session-runtime",
@@ -522,19 +491,22 @@
       "openclaw/plugin-sdk/webhook-targets",
       "openclaw/plugin-sdk/websocket-runtime",
       "openclaw/plugin-sdk/widget-html",
-      "openclaw/plugin-sdk/windows-spawn"
+      "openclaw/plugin-sdk/windows-spawn",
+      "openclaw/plugin-sdk/worker-task-server"
     ],
     "pluginSdkEntrypointsPath": null,
     "reservedSdkExportCount": 0,
     "reservedSdkExports": [],
     "supportedFacadeSdkExports": [],
     "publicPluginOwnedSdkExports": [],
-    "manifestTypesPath": "dist/agent-scope-BLF4v6YQ.d.ts",
+    "manifestTypesPath": "dist/cli-backend.types-EMzB3xUc.d.ts",
     "manifestFieldCount": 0,
     "manifestFields": [],
-    "manifestContractFieldCount": 22,
+    "manifestContractFieldCount": 24,
     "manifestContractFields": [
       "agentToolResultMiddleware",
+      "codeModeExecutors",
+      "decisionProviders",
       "documentExtractors",
       "embeddedExtensionFactories",
       "embeddingProviders",
@@ -558,15 +530,15 @@
       "workerProviders"
     ],
     "requestedVersion": "latest",
-    "eligibilityVersion": "2026.9.5",
+    "eligibilityVersion": "2026.9.8",
     "source": {
       "type": "npm",
       "package": "openclaw",
       "registry": "https://registry.npmjs.org",
       "distTag": "latest",
-      "tarball": "https://registry.npmjs.org/openclaw/-/openclaw-2026.9.5.tgz",
-      "integrity": "sha512-TCO/ImVLh5HkF4tdfo7iriIa7kT6iYkIr/jR5ZOkePGFGhUx5Oe7DE716Y1DzzG2teRAVDdCjgJDu1A24Yta7w==",
-      "shasum": "734278f0f61d9fa9efa68edd11a3c97674f24e58",
+      "tarball": "https://registry.npmjs.org/openclaw/-/openclaw-2026.9.8.tgz",
+      "integrity": "sha512-G+JkNUhtpDE3cXR4AEi2NyyG9fqI/T2WUSl8ZnR8AATH8Dh1kC3qYFL7wwPoZtgHiP/cszA86PEiE0PDysxb9Q==",
+      "shasum": "7246c389c7134d9c15622082772912c7082f68af",
       "repository": {
         "url": "git+https://github.com/openclaw/openclaw.git",
         "type": "git"
@@ -574,7 +546,7 @@
     },
     "cache": {
       "hit": true,
-      "key": "2026.9.5-7658b800a1d6"
+      "key": "2026.9.8-950909b8812e"
     }
   },
   "status": "pass",
@@ -586,7 +558,7 @@
   },
   "fixtures": [
     {
-      "id": "ai-security-force",
+      "id": "nibvok-ai-security",
       "name": "NIBVOK AI Security",
       "priority": "high",
       "seams": [
@@ -601,8 +573,8 @@
         {
           "name": "before_tool_call",
           "file": "index.js",
-          "line": 97,
-          "ref": "index.js:97"
+          "line": 128,
+          "ref": "index.js:128"
         }
       ],
       "registrations": [
@@ -612,8 +584,8 @@
         {
           "name": "definePluginEntry",
           "file": "index.js",
-          "line": 92,
-          "ref": "index.js:92"
+          "line": 122,
+          "ref": "index.js:122"
         }
       ],
       "manifestContracts": [],
@@ -621,11 +593,14 @@
         "openclaw.plugin.json"
       ],
       "sourceFiles": [
+        ".github/scripts/traffic-rows.mjs",
         "audit-chain.js",
         "classifier.js",
         "index.js",
         "policies.js",
         "test-audit-chain.mjs",
+        "test-audit-env.mjs",
+        "test-audit-log-isolation.mjs",
         "test-classifier.mjs",
         "test-hook.mjs",
         "test-policies.mjs",
@@ -657,8 +632,8 @@
       "securityManifests": [],
       "package": {
         "path": "package.json",
-        "name": "@nibvok-llc/ai-security-force",
-        "version": "0.1.0",
+        "name": "@nibvok-llc/nibvok-ai-security",
+        "version": "0.1.1",
         "type": "module",
         "main": null,
         "npmPack": {
@@ -702,7 +677,7 @@
           "buildOpenClawVersion": "2026.9.4",
           "buildPluginSdkVersion": null,
           "install": {
-            "clawhubSpec": "clawhub:@nibvok-llc/ai-security-force",
+            "clawhubSpec": "clawhub:@nibvok-llc/nibvok-ai-security",
             "npmSpec": null,
             "defaultChoice": "clawhub",
             "minHostVersion": ">=2026.9.0"
@@ -726,8 +701,8 @@
       "packages": [
         {
           "path": "package.json",
-          "name": "@nibvok-llc/ai-security-force",
-          "version": "0.1.0",
+          "name": "@nibvok-llc/nibvok-ai-security",
+          "version": "0.1.1",
           "type": "module",
           "main": null,
           "npmPack": {
@@ -771,7 +746,7 @@
             "buildOpenClawVersion": "2026.9.4",
             "buildPluginSdkVersion": null,
             "install": {
-              "clawhubSpec": "clawhub:@nibvok-llc/ai-security-force",
+              "clawhubSpec": "clawhub:@nibvok-llc/nibvok-ai-security",
               "npmSpec": null,
               "defaultChoice": "clawhub",
               "minHostVersion": ">=2026.9.0"
@@ -811,7 +786,7 @@
   "contractProbes": [],
   "logs": [
     {
-      "fixture": "ai-security-force",
+      "fixture": "nibvok-ai-security",
       "code": "seam-inventory",
       "level": "log",
       "message": "observed 1 hooks, 1 registrations, and 0 manifest contracts",
@@ -821,23 +796,14 @@
       ]
     },
     {
-      "fixture": "ai-security-force",
-      "code": "hook-names-present",
-      "level": "log",
-      "message": "all observed hooks exist in the target OpenClaw hook registry",
-      "evidence": [
-        "before_tool_call"
-      ]
-    },
-    {
-      "fixture": "ai-security-force",
+      "fixture": "nibvok-ai-security",
       "code": "api-registrars-present",
       "level": "log",
       "message": "all observed api.register* calls exist in the target OpenClaw plugin API builder",
       "evidence": []
     },
     {
-      "fixture": "ai-security-force",
+      "fixture": "nibvok-ai-security",
       "code": "sdk-exports-present",
       "level": "log",
       "message": "all observed plugin SDK imports exist in target OpenClaw package exports",
@@ -846,14 +812,14 @@
       ]
     },
     {
-      "fixture": "ai-security-force",
+      "fixture": "nibvok-ai-security",
       "code": "package-metadata",
       "level": "log",
       "message": "selected package metadata for plugin contract checks",
       "evidence": [
         "package.json",
-        "@nibvok-llc/ai-security-force",
-        "version:0.1.0"
+        "@nibvok-llc/nibvok-ai-security",
+        "version:0.1.1"
       ]
     }
   ],

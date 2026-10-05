@@ -1,0 +1,58 @@
+name: Package publish
+
+# Publishes the plugin to ClawHub from CI on a `v*` tag. Publishing from a
+# GitHub-hosted runner (rather than a laptop) is what produces the *build
+# attestation* that flips the ClawHub listing's hasProvenance false -> true:
+# the artifact is tied to this tagged commit by a verified builder identity.
+#
+# The only third-party action is actions/checkout, pinned to a commit SHA for
+# the same supply-chain reason as traffic-tracker.yml.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# contents: read  - checkout the tagged commit
+# id-token: write - mint the GitHub OIDC identity used for the attestation
+permissions:
+  contents: read
+  id-token: write
+
+# Never let two publishes race on the same version.
+concurrency:
+  group: package-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install ClawHub CLI
+        run: npm install -g clawhub@0.23.3
+
+      - name: Publish to ClawHub
+        env:
+          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CLAWHUB_TOKEN:-}" ]; then
+            echo "::error::CLAWHUB_TOKEN secret is not set"; exit 1
+          fi
+          # Authenticate non-interactively. The token comes from a repo secret
+          # (human-held) and is never echoed; GitHub masks it in logs.
+          clawhub login --token "$CLAWHUB_TOKEN" >/dev/null
+          # Strip a leading "v" so the tag (v0.1.1) matches package.json (0.1.1);
+          # the CLI errors on a version mismatch.
+          clawhub package publish . \
+            --family code-plugin \
+            --owner nibvok-llc \
+            --version "${GITHUB_REF_NAME#v}" \
+            --changelog "Release ${GITHUB_REF_NAME} — see CHANGELOG.md" \
+            --source-repo "${GITHUB_REPOSITORY}" \
+            --source-commit "${GITHUB_SHA}" \
+            --source-ref "${GITHUB_REF_NAME}" \
+            --wait

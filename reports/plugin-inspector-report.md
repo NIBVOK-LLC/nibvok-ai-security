@@ -78,11 +78,11 @@ _none_
 
 | Metric                    | Value                                    |
 | ------------------------- | ---------------------------------------- |
-| Configured path           | npm:openclaw@2026.9.5                    |
+| Configured path           | npm:openclaw@2026.9.8                    |
 | Status                    | ok                                       |
 | Requested version         | latest                                   |
-| Resolved version          | 2026.9.5                                 |
-| Range eligibility version | 2026.9.5                                 |
+| Resolved version          | 2026.9.8                                 |
+| Range eligibility version | 2026.9.8                                 |
 | Source                    | npm:openclaw                             |
 | NPM dist-tag              | latest                                   |
 | Prepared cache            | hit                                      |
@@ -90,17 +90,17 @@ _none_
 | Compat records            | 0                                        |
 | Compat status counts      | -                                        |
 | Record ids                | -                                        |
-| Hook registry             | dist/api-DArLOVCi.d.ts                   |
-| Hook names                | 42                                       |
-| API builder               | dist/agent-harness-runtime-D1Ww9PgY.d.ts |
-| API registrars            | 57                                       |
-| Captured registration     | dist/agent-harness-runtime-D1Ww9PgY.d.ts |
-| Captured registrars       | 57                                       |
+| Hook registry             | dist/channel-core-DsgKN1pZ.d.ts          |
+| Hook names                | 0                                        |
+| API builder               | dist/agent-harness-runtime-y6jiaaqJ.d.ts |
+| API registrars            | 58                                       |
+| Captured registration     | dist/agent-harness-runtime-y6jiaaqJ.d.ts |
+| Captured registrars       | 58                                       |
 | Package metadata          | package.json                             |
-| Plugin SDK exports        | 341                                      |
-| Manifest types            | dist/agent-scope-BLF4v6YQ.d.ts           |
+| Plugin SDK exports        | 352                                      |
+| Manifest types            | dist/cli-backend.types-EMzB3xUc.d.ts     |
 | Manifest fields           | 0                                        |
-| Manifest contract fields  | 22                                       |
+| Manifest contract fields  | 24                                       |
 
 ## Warnings
 
@@ -120,9 +120,9 @@ _none_
 
 ## Fixture Seam Inventory
 
-| Fixture           | Priority | Seams          | Hooks            | Registrations     | Manifest contracts |
-| ----------------- | -------- | -------------- | ---------------- | ----------------- | ------------------ |
-| ai-security-force | high     | plugin-runtime | before_tool_call | definePluginEntry | -                  |
+| Fixture            | Priority | Seams          | Hooks            | Registrations     | Manifest contracts |
+| ------------------ | -------- | -------------- | ---------------- | ----------------- | ------------------ |
+| nibvok-ai-security | high     | plugin-runtime | before_tool_call | definePluginEntry | -                  |
 
 ## Decision Matrix
 
@@ -130,10 +130,9 @@ _none_
 
 ## Raw Logs
 
-| Fixture           | Code                   | Level | Message                                                                          | Evidence                                                   | Compat record |
-| ----------------- | ---------------------- | ----- | -------------------------------------------------------------------------------- | ---------------------------------------------------------- | ------------- |
-| ai-security-force | seam-inventory         | log   | observed 1 hooks, 1 registrations, and 0 manifest contracts                      | hook:before_tool_call, registration:definePluginEntry      | -             |
-| ai-security-force | hook-names-present     | log   | all observed hooks exist in the target OpenClaw hook registry                    | before_tool_call                                           | -             |
-| ai-security-force | api-registrars-present | log   | all observed api.register* calls exist in the target OpenClaw plugin API builder | -                                                          | -             |
-| ai-security-force | sdk-exports-present    | log   | all observed plugin SDK imports exist in target OpenClaw package exports         | openclaw/plugin-sdk/plugin-entry                           | -             |
-| ai-security-force | package-metadata       | log   | selected package metadata for plugin contract checks                             | package.json, @nibvok-llc/ai-security-force, version:0.1.0 | -             |
+| Fixture            | Code                   | Level | Message                                                                          | Evidence                                                    | Compat record |
+| ------------------ | ---------------------- | ----- | -------------------------------------------------------------------------------- | ----------------------------------------------------------- | ------------- |
+| nibvok-ai-security | seam-inventory         | log   | observed 1 hooks, 1 registrations, and 0 manifest contracts                      | hook:before_tool_call, registration:definePluginEntry       | -             |
+| nibvok-ai-security | api-registrars-present | log   | all observed api.register* calls exist in the target OpenClaw plugin API builder | -                                                           | -             |
+| nibvok-ai-security | sdk-exports-present    | log   | all observed plugin SDK imports exist in target OpenClaw package exports         | openclaw/plugin-sdk/plugin-entry                            | -             |
+| nibvok-ai-security | package-metadata       | log   | selected package metadata for plugin contract checks                             | package.json, @nibvok-llc/nibvok-ai-security, version:0.1.1 | -             |
