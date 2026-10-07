@@ -4,7 +4,7 @@
 confirmed, or denied *before* it runs.**
 
 Version `0.1.0` · Plugin id `nibvok-ai-security` · Category `security`
-Zero-config · One hook · 363 tests
+Zero-config · One hook · 300+ tests
 
 ---
 
@@ -12,7 +12,7 @@ Zero-config · One hook · 363 tests
 
 **Description** — 92 characters (limit 120):
 
-> Runtime enforcement for OpenClaw agents. Allow, confirm, or deny every tool call. 363 tests.
+> Runtime enforcement for OpenClaw agents. Allow, confirm, or deny every tool call. 300+ tests.
 
 > An earlier draft of this line ended *"Hash-chained audit trail."* It was removed
 > when there was no hash chain. **As of 2026-09-21 there is one** — every audit
@@ -91,7 +91,7 @@ log, so the reasoning is reviewable after the fact rather than inferred.
 
 ## Proof
 
-The behaviour is covered by **363 tests** across five suites:
+The behaviour is covered by **300+ tests** across five suites:
 
 | Suite | Tests | Covers |
 |---|---|---|
@@ -100,6 +100,9 @@ The behaviour is covered by **363 tests** across five suites:
 | `test-session-trust.mjs` | 27 | session-scoped trust: grant, scope, and restart expiry |
 | `test-audit-chain.mjs` | 18 | a modified, reordered, removed or inserted audit entry breaks the hash chain |
 | `test-policies.mjs` | 15 | each of the five preset postures, cold-loaded |
+
+*(Per-suite figures are indicative and vary by harness/commit — `test-classifier.mjs` uses a simple
+assert count; three suites use a different harness. Run the suites for the current exact totals.)*
 
 Run them yourself:
 
