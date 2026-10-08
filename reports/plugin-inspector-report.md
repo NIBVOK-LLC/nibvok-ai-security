@@ -78,11 +78,11 @@ _none_
 
 | Metric                    | Value                                    |
 | ------------------------- | ---------------------------------------- |
-| Configured path           | npm:openclaw@2026.9.8                    |
+| Configured path           | npm:openclaw@2026.9.9                    |
 | Status                    | ok                                       |
 | Requested version         | latest                                   |
-| Resolved version          | 2026.9.8                                 |
-| Range eligibility version | 2026.9.8                                 |
+| Resolved version          | 2026.9.9                                 |
+| Range eligibility version | 2026.9.9                                 |
 | Source                    | npm:openclaw                             |
 | NPM dist-tag              | latest                                   |
 | Prepared cache            | hit                                      |
@@ -90,15 +90,15 @@ _none_
 | Compat records            | 0                                        |
 | Compat status counts      | -                                        |
 | Record ids                | -                                        |
-| Hook registry             | dist/channel-core-DsgKN1pZ.d.ts          |
+| Hook registry             | dist/channel-core-5mS6rc1E.d.ts          |
 | Hook names                | 0                                        |
-| API builder               | dist/agent-harness-runtime-y6jiaaqJ.d.ts |
+| API builder               | dist/agent-harness-runtime-R8dTs5zl.d.ts |
 | API registrars            | 58                                       |
-| Captured registration     | dist/agent-harness-runtime-y6jiaaqJ.d.ts |
+| Captured registration     | dist/agent-harness-runtime-R8dTs5zl.d.ts |
 | Captured registrars       | 58                                       |
 | Package metadata          | package.json                             |
 | Plugin SDK exports        | 352                                      |
-| Manifest types            | dist/cli-backend.types-EMzB3xUc.d.ts     |
+| Manifest types            | dist/cli-backend.types-8yNEL-p2.d.ts     |
 | Manifest fields           | 0                                        |
 | Manifest contract fields  | 24                                       |
 

@@ -4,6 +4,26 @@ All notable changes to **@nibvok-llc/nibvok-ai-security** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and versions
 use [Semantic Versioning](https://semver.org/).
 
+## [0.1.2] — 2026-10-08
+
+Documentation and honesty hardening. **No change to the runtime enforcement
+path** — every allow / confirm / deny decision and the audit-chain format are
+unchanged from 0.1.1.
+
+### Changed
+
+- **`LISTING.md` test-count wording** corrected to match the shipped suites
+  ("363" → "300+"); the previous figure was stale against the actual test set.
+
+### Documented
+
+- **`INCIDENTS.md` #25** — a classifier that trusts *declared* features rather
+  than *derived* ones (documented; not fixed, per owner).
+- **`INCIDENTS.md` #26** — a wrapper that trusted a scalar (an exit code) over
+  the finding the run printed; the same false-green class as #6 and #22, and the
+  flip side of #25. Fixed: exit contract + wrapper mapping + briefing parser +
+  controls, verified at source.
+
 ## [0.1.1] — 2026-10-05
 
 Supply-chain and provenance hardening. **No change to the runtime enforcement

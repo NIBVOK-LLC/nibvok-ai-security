@@ -1,6 +1,6 @@
 {
   "name": "@nibvok-llc/nibvok-ai-security",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "description": "Runtime policy enforcement for OpenClaw agents: allow, confirm, or deny every tool call.",
   "files": [

@@ -1,20 +1,20 @@
 {
   "generatedAt": "deterministic",
   "targetOpenClaw": {
-    "configuredPath": "npm:openclaw@2026.9.8",
+    "configuredPath": "npm:openclaw@2026.9.9",
     "searchedPaths": [
-      "npm:openclaw@2026.9.8"
+      "npm:openclaw@2026.9.9"
     ],
     "status": "ok",
-    "version": "2026.9.8",
+    "version": "2026.9.9",
     "compatRegistryPath": null,
     "compatRecordCount": 0,
     "compatRecords": [],
     "compatRecordStatuses": {},
-    "hookTypesPath": "dist/channel-core-DsgKN1pZ.d.ts",
+    "hookTypesPath": "dist/channel-core-5mS6rc1E.d.ts",
     "hookNameCount": 0,
     "hookNames": [],
-    "apiBuilderPath": "dist/agent-harness-runtime-y6jiaaqJ.d.ts",
+    "apiBuilderPath": "dist/agent-harness-runtime-R8dTs5zl.d.ts",
     "apiRegistrarCount": 58,
     "apiRegistrars": [
       "registerAgentEventSubscription",
@@ -76,7 +76,7 @@
       "registerWidgetPresenter",
       "registerWorkerProvider"
     ],
-    "capturedRegistrationPath": "dist/agent-harness-runtime-y6jiaaqJ.d.ts",
+    "capturedRegistrationPath": "dist/agent-harness-runtime-R8dTs5zl.d.ts",
     "capturedRegistrarCount": 58,
     "capturedRegistrars": [
       "registerAgentEventSubscription",
@@ -499,7 +499,7 @@
     "reservedSdkExports": [],
     "supportedFacadeSdkExports": [],
     "publicPluginOwnedSdkExports": [],
-    "manifestTypesPath": "dist/cli-backend.types-EMzB3xUc.d.ts",
+    "manifestTypesPath": "dist/cli-backend.types-8yNEL-p2.d.ts",
     "manifestFieldCount": 0,
     "manifestFields": [],
     "manifestContractFieldCount": 24,
@@ -530,15 +530,15 @@
       "workerProviders"
     ],
     "requestedVersion": "latest",
-    "eligibilityVersion": "2026.9.8",
+    "eligibilityVersion": "2026.9.9",
     "source": {
       "type": "npm",
       "package": "openclaw",
       "registry": "https://registry.npmjs.org",
       "distTag": "latest",
-      "tarball": "https://registry.npmjs.org/openclaw/-/openclaw-2026.9.8.tgz",
-      "integrity": "sha512-G+JkNUhtpDE3cXR4AEi2NyyG9fqI/T2WUSl8ZnR8AATH8Dh1kC3qYFL7wwPoZtgHiP/cszA86PEiE0PDysxb9Q==",
-      "shasum": "7246c389c7134d9c15622082772912c7082f68af",
+      "tarball": "https://registry.npmjs.org/openclaw/-/openclaw-2026.9.9.tgz",
+      "integrity": "sha512-3sB6ejq5smBozfBhVEDfK48wFpbkx+0f6PJ19qZjC3ab3RoFrYO58CnE2mAsbUy8sXdxdBtjQ3vkAqcW9BZXAw==",
+      "shasum": "fd8827563525112d0295e5c592bdf33cfacfab95",
       "repository": {
         "url": "git+https://github.com/openclaw/openclaw.git",
         "type": "git"
@@ -546,7 +546,7 @@
     },
     "cache": {
       "hit": true,
-      "key": "2026.9.8-950909b8812e"
+      "key": "2026.9.9-8d3e5da54cc1"
     }
   },
   "status": "pass",
