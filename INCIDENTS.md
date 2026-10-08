@@ -1,4 +1,4 @@
-# INCIDENTS.md — twenty-two case studies
+# INCIDENTS.md — twenty-three case studies
 
 Failures found while building and running this layer. Each one changed the code
 or the process. They are kept because the *reasoning* is the reusable part.
@@ -18,6 +18,11 @@ entry itself.** The section that follows them, *The Meta-Lesson — The Analyst 
 Not Verified*, is the point of the batch. **#18 is the first entry in this file to
 originate with the agent rather than the analyst, auditor, or owner** — the guard
 covered the config verbs it named but not the effect of a synonym it did not.
+
+**#25 is the first entry documenting a defect the owner ordered recorded but NOT yet
+fixed** (owner ruling 2026-10-08: *document it; fix it after the launch*). It is the
+same class as #6 (the false pass) and the silent-enforcement-failure class: the guard
+reports healthy while the thing it guards is unenforced.
 
 **Numbering note — the gap at #9.** Entries run #1–#8, then **#10**. #9 is absent
 on purpose and is not a missing write-up: the export entry was *requested* as
@@ -1535,3 +1540,77 @@ before trusting what it decides. And when a matcher is the gate, remember that a
 family of tools whose names are chosen by someone else can never be enumerated into an
 allowlist — the correct answer is to widen the hook and narrow the default, in that
 order and in the same change.
+
+---
+
+## #25 — The declared feature: a classifier that trusts the label, not the action
+
+**Class:** governance gap (fail-open on unknown input; the instrument measures the
+*descriptor*, never the executed effect) · **Detected by:** adversarial probing of the
+Decision-Envelope dry-run + independent reproduction · **Origin:** the agent
+(James ⚙️; reproduced by DOCTOR 💓 and Ward 🩺; architecture read by FOUNDRY/Ryder 🏗️)
+· **Date:** 2026-10-08 · **Fixed:** **NO — documented by owner instruction, to be fixed
+after the first-client launch**
+
+### What happened
+
+The proposed Decision Envelope classifies an action by a list of **features** —
+`reversible_op`, `new_egress_host`, `spend`, `external_surface`, and so on — and maps
+the feature set to a tier (T0–T4). The load-bearing assumption is that the features
+are **facts about the action**. They are not: they are **claims**, supplied *with* the
+action, and nothing in the pipeline derives them from what the action is actually
+about to do.
+
+A dry-run (`envelope-dryrun.mjs`) reported **20/20 PASS** and was read as proving the
+classifier does not expand permission. It proves no such thing. It compares a
+**self-declared** feature list against a rubric. Omit a hard feature from the label —
+describe a workspace escape or a secret-write as a plain `reversible_op` — and the
+action lands at **T2 (auto)**, not T4. Pass(20/20) is non-expansion *relative to its
+own premises*: garbage-in, green-out.
+
+This was not theory. Three cells found it independently and one proved it:
+
+- **FOUNDRY** — the `before_tool_call` hook receives only `toolName`, `params`,
+  `derivedPaths`, `sessionKey`. There is **no intent/feature channel**. Features would
+  have to be **derived**; no feature extractor exists.
+- **DOCTOR** — ran three adversarial cases (a write outside the workspace, a
+  file-permission change, egress to a known host) through the dry-run. All three fell
+  through Rule 2 to **T2 auto** where they should have been T4. Reproduced.
+- **Ward** — independently reproduced the same fail-open.
+- **Crystal** — "the seam is the declaration, not the rubric."
+
+The gap is the same at runtime as in the dry-run: even a *perfect* classifier checks
+the **descriptor**, never **what the action then does**. A decision-row can say
+`reversible_op` while the executed effect is irreversible.
+
+### Why it is this class
+
+Same shape as **#6 (the false pass)**: the guard reports healthy while the thing it
+guards is unenforced — here, because the input the guard trusts is a claim made by
+the party it is guarding. Same shape as the **silent-enforcement-failure** class (the
+owner groups it with #6 and #22): no rule is *wrong*, and the failure is *silent* — an
+auto-approved wrong action never trips a gate, so nothing downstream notices. The
+suites are green; coverage of the **effect** is zero.
+
+### The fix (NOT applied — documented only, per owner instruction)
+
+Owner ruling 2026-10-08: **do not fix this week; document it; fix it after the
+launch.** The remediation the cells converged on, for when it is picked up:
+
+1. **Feature vocabulary as a closed ALLOWLIST with default-escalate.** Unknown or
+   absent feature ⇒ **escalate (T4/HOLD)**, never auto-allow. The current denylist is
+   fail-open. *(James applied this to the dry-run on 2026-10-08 — re-ran 29 cases PASS
+   — which closes the **unit** layer only; the integration gap remains open.)*
+2. **Derive features at action time**, and reconcile **requested-vs-executed** effect
+   as a standing gate.
+3. **Adversarial battery with UNSEEN features** as a permanent regression, not a
+   one-off probe.
+4. **Tamper-evident effect log** the auto-approver cannot write unilaterally.
+
+### Lesson
+
+**A classifier that trusts a self-declared label is a policy function, not an
+observation layer.** Proving the function is correct proves nothing about whether the
+runtime ever feeds it the truth. Ask not "does the rubric pass its tests" but **"can
+the input that feeds this rubric be wrong, and what happens when it is."** When that
+input is a claim made by the party being governed, the honest default is **escalate.**
