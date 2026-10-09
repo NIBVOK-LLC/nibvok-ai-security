@@ -3,7 +3,7 @@
 **Runtime policy enforcement for OpenClaw agents — every tool call is allowed,
 confirmed, or denied *before* it runs.**
 
-Version `0.1.0` · Plugin id `nibvok-ai-security` · Category `security`
+Version `0.1.2` · Plugin id `nibvok-ai-security` · Category `security`
 Zero-config · One hook · 300+ tests
 
 ---
