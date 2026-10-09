@@ -5,7 +5,7 @@ call — before it runs.
 
 A runtime policy-enforcement layer for OpenClaw agents.
 
-> **Status:** running in production on the author's own agent. Version `0.1.0`.
+> **Status:** running in production on the author's own agent. Version `0.1.2`.
 > Plugin id `nibvok-ai-security`; categories `["security"]`.
 
 ---
